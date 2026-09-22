@@ -38,16 +38,13 @@ export default function ScanPage() {
               // Not a URL, use as-is
             }
 
-            // Stop scanner, wait for it, then navigate
+            // Stop scanner, wait for it, then navigate via hard reload to reset context
             if (html5QrCode) {
-              html5QrCode.stop().then(() => {
-                router.push(`/team/task/${token}`);
-              }).catch(() => {
-                // Navigate anyway if stop fails
-                router.push(`/team/task/${token}`);
+              html5QrCode.stop().catch(() => {}).finally(() => {
+                window.location.href = `/team/task/${token}`;
               });
             } else {
-              router.push(`/team/task/${token}`);
+              window.location.href = `/team/task/${token}`;
             }
           },
           () => {} // ignore scan failures
@@ -75,10 +72,10 @@ export default function ScanPage() {
     if (manualToken.trim()) {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {}).finally(() => {
-          router.push(`/team/task/${manualToken.trim()}`);
+          window.location.href = `/team/task/${manualToken.trim()}`;
         });
       } else {
-        router.push(`/team/task/${manualToken.trim()}`);
+        window.location.href = `/team/task/${manualToken.trim()}`;
       }
     }
   };
