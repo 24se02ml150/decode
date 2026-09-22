@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
 import { users, events, rounds, tasks, teamRounds, teamTasks, taskAttempts } from '../../db/schema.js';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc } from 'drizzle-orm';
 
 const router = Router();
 
@@ -64,55 +64,54 @@ router.get('/overview', async (req, res, next) => {
   }
 });
 
-// GET /api/admin/results/live-progress — live team progress
-router.get('/live-progress', async (req, res, next) => {
+// GET /api/admin/results/live-leaderboard — real-time overall leaderboard
+router.get('/live-leaderboard', async (req, res, next) => {
   try {
-    const roundId = req.query.roundId ? parseInt(req.query.roundId) : null;
+    const leaderboardRaw = await db.select({
+      teamId: users.id,
+      teamIdCode: users.teamId,
+      teamName: users.teamName,
+      isActive: users.isActive,
+      score: sql`CAST(COALESCE(SUM(${tasks.points}), 0) AS INTEGER)`,
+      tasksCompleted: sql`CAST(COUNT(${teamTasks.id}) AS INTEGER)`,
+      lastActivity: sql`MAX(${teamTasks.updatedAt})`,
+    }).from(users)
+      .leftJoin(teamTasks, and(eq(teamTasks.teamId, users.id), eq(teamTasks.isCompleted, true)))
+      .leftJoin(tasks, eq(teamTasks.taskId, tasks.id))
+      .where(eq(users.role, 'team'))
+      .groupBy(users.id, users.teamId, users.teamName, users.isActive)
+      .orderBy(desc(sql`COALESCE(SUM(${tasks.points}), 0)`), asc(sql`MAX(${teamTasks.updatedAt})`));
 
-    let teamProgress;
-    if (roundId) {
-      const teamProgressRaw = await db.select({
-        teamId: users.id,
-        teamIdCode: users.teamId,
-        teamName: users.teamName,
-        isActive: users.isActive,
-        score: teamRounds.score,
-        tasksCompleted: teamRounds.tasksCompleted,
-        isQualified: teamRounds.isQualified,
-        startedAt: teamRounds.startedAt,
-        completedAt: teamRounds.completedAt,
-      }).from(teamRounds)
-        .innerJoin(users, eq(teamRounds.teamId, users.id))
-        .where(eq(teamRounds.roundId, roundId))
-        .orderBy(desc(teamRounds.score));
-        
-      teamProgress = teamProgressRaw;
-    } else {
-      // Get all teams with latest round progress
-      teamProgress = await db.select({
-        teamId: users.id,
-        teamIdCode: users.teamId,
-        teamName: users.teamName,
-        isActive: users.isActive,
-      }).from(users).where(eq(users.role, 'team')).orderBy(users.teamName);
+    // Get current round info (the highest round started by each team)
+    const teamRoundContext = await db.select({
+      teamId: teamRounds.teamId,
+      roundId: teamRounds.roundId,
+      roundName: rounds.name
+    }).from(teamRounds)
+      .innerJoin(rounds, eq(teamRounds.roundId, rounds.id))
+      .orderBy(desc(teamRounds.roundId));
+
+    const roundMap = new Map();
+    for (const tr of teamRoundContext) {
+      if (!roundMap.has(tr.teamId)) {
+        roundMap.set(tr.teamId, tr.roundName); // gets the highest roundId since it's ordered by desc
+      }
     }
 
-    // Get total tasks for the round
-    let totalTasks = 0;
-    if (roundId) {
-      const [r] = await db.select().from(rounds).where(eq(rounds.id, roundId));
-      const [tc] = await db.select({ count: sql`count(*)` }).from(tasks).where(eq(tasks.roundId, roundId));
-      totalTasks = r?.assignCount || parseInt(tc.count) || 0;
-    }
+    const leaderboard = leaderboardRaw.map(t => ({
+      ...t,
+      currentRoundName: roundMap.get(t.teamId) || 'Not Started'
+    }));
 
     res.json({
       success: true,
-      data: { teamProgress, totalTasks },
+      data: { teamProgress: leaderboard },
     });
   } catch (err) {
     next(err);
   }
 });
+
 
 // GET /api/admin/results/round/:roundId — round results
 router.get('/round/:roundId', async (req, res, next) => {

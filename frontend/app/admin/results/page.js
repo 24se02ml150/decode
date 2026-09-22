@@ -59,7 +59,7 @@ export default function ResultsPage() {
   const refreshLiveData = async () => {
     setRefreshing(true);
     try {
-      const res = await api.admin.getLiveProgress(selectedRound);
+      const res = await api.admin.getLiveProgress();
       setLiveData(res.data);
     } catch (err) {
       console.error(err);
@@ -86,6 +86,8 @@ export default function ResultsPage() {
     
     if (type === 'teams') {
       window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/reports/teams?format=${format}`, '_blank');
+    } else if (type === 'live') {
+      window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/reports/live-leaderboard?format=${format}`, '_blank');
     } else if (type === 'round' && selectedRound) {
       window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/reports/round-results/${selectedRound}?format=${format}`, '_blank');
     } else if (type === 'full') {
@@ -171,7 +173,12 @@ export default function ResultsPage() {
                 <h3 className="font-bold text-text-primary flex items-center gap-2">
                   <Trophy size={18} className="text-warning" /> Overall Standings
                 </h3>
-                <span className="badge badge-neutral text-xs">Auto-updates</span>
+                <div className="flex items-center gap-3">
+                  <span className="badge badge-neutral text-xs">Auto-updates</span>
+                  <button onClick={() => handleExport('live')} className="btn btn-secondary btn-sm gap-2">
+                    <Download size={14} /> Export
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -179,7 +186,9 @@ export default function ResultsPage() {
                     <tr>
                       <th className="px-6 py-3 font-medium">Rank</th>
                       <th className="px-6 py-3 font-medium">Team Name</th>
-                      <th className="px-6 py-3 font-medium">Total Score</th>
+                      <th className="px-6 py-3 font-medium">Current Round</th>
+                      <th className="px-6 py-3 font-medium text-center">Tasks Completed</th>
+                      <th className="px-6 py-3 font-medium text-right">Total Score</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -192,14 +201,20 @@ export default function ResultsPage() {
                           {team.teamName}
                           {!team.isActive && <span className="ml-2 badge badge-error text-[10px]">Inactive</span>}
                         </td>
-                        <td className="px-6 py-4 font-bold text-accent">
+                        <td className="px-6 py-4 text-text-secondary">
+                          {team.currentRoundName}
+                        </td>
+                        <td className="px-6 py-4 text-center font-medium">
+                          {team.tasksCompleted || 0}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-accent text-right">
                           {team.score || 0} pts
                         </td>
                       </tr>
                     ))}
                     {(!liveData?.teamProgress || liveData.teamProgress.length === 0) && (
                       <tr>
-                        <td colSpan="3" className="px-6 py-8 text-center text-text-muted">No team data available</td>
+                        <td colSpan="5" className="px-6 py-8 text-center text-text-muted">No team data available</td>
                       </tr>
                     )}
                   </tbody>

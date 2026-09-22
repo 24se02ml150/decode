@@ -116,7 +116,7 @@ export const api = {
 
     // Results
     getOverview: () => request('/api/admin/results/overview'),
-    getLiveProgress: (roundId) => request(`/api/admin/results/live-progress?roundId=${roundId || ''}`),
+    getLiveProgress: () => request(`/api/admin/results/live-leaderboard`),
     getRoundResults: (roundId) => request(`/api/admin/results/round/${roundId}`),
     getRecentActivity: () => request('/api/admin/results/recent-activity'),
 

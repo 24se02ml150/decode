@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
 import { users, rounds, tasks, teamRounds, teamTasks, taskAttempts, teamTaskAssignments } from '../../db/schema.js';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc } from 'drizzle-orm';
 
 const router = Router();
 
@@ -39,6 +39,53 @@ router.get('/teams', async (req, res, next) => {
     }
 
     res.json({ success: true, data: teamList });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/reports/live-leaderboard
+router.get('/live-leaderboard', async (req, res, next) => {
+  try {
+    const leaderboardRaw = await db.select({
+      teamId: users.id,
+      teamIdCode: users.teamId,
+      teamName: users.teamName,
+      score: sql`CAST(COALESCE(SUM(${tasks.points}), 0) AS INTEGER)`,
+      tasksCompleted: sql`CAST(COUNT(${teamTasks.id}) AS INTEGER)`,
+      lastActivity: sql`MAX(${teamTasks.updatedAt})`,
+    }).from(users)
+      .leftJoin(teamTasks, and(eq(teamTasks.teamId, users.id), eq(teamTasks.isCompleted, true)))
+      .leftJoin(tasks, eq(teamTasks.taskId, tasks.id))
+      .where(eq(users.role, 'team'))
+      .groupBy(users.id, users.teamId, users.teamName)
+      .orderBy(desc(sql`COALESCE(SUM(${tasks.points}), 0)`), asc(sql`MAX(${teamTasks.updatedAt})`));
+
+    const teamRoundContext = await db.select({
+      teamId: teamRounds.teamId,
+      roundName: rounds.name
+    }).from(teamRounds)
+      .innerJoin(rounds, eq(teamRounds.roundId, rounds.id))
+      .orderBy(desc(teamRounds.roundId));
+
+    const roundMap = new Map();
+    for (const tr of teamRoundContext) {
+      if (!roundMap.has(tr.teamId)) roundMap.set(tr.teamId, tr.roundName);
+    }
+
+    const leaderboard = leaderboardRaw.map(t => ({
+      ...t,
+      currentRoundName: roundMap.get(t.teamId) || 'Not Started'
+    }));
+
+    if (req.query.format === 'csv') {
+      const csv = toCSV(['teamIdCode', 'teamName', 'currentRoundName', 'score', 'tasksCompleted', 'lastActivity'], leaderboard);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="live_leaderboard.csv"');
+      return res.send(csv);
+    }
+
+    res.json({ success: true, data: leaderboard });
   } catch (err) {
     next(err);
   }
