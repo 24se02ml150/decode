@@ -111,19 +111,14 @@ router.get('/', async (req, res, next) => {
               taskOrder: tasks.taskOrder,
               points: tasks.points,
               roundId: tasks.roundId,
+              locationId: tasks.locationId,
             }).from(tasks)
               .where(and(
                 eq(tasks.roundId, activeRound.id),
                 eq(tasks.isActive, true),
                 inArray(tasks.id, assignedTaskIds)
               ))
-              .leftJoin(locations, eq(tasks.locationId, locations.id))
               .orderBy(tasks.taskOrder);
-              
-            taskList = taskList.map(t => ({
-              ...t.tasks,
-              startingClue: t.locations?.startingClue
-            }));
           } else {
             taskList = [];
           }
@@ -134,15 +129,21 @@ router.get('/', async (req, res, next) => {
             taskOrder: tasks.taskOrder,
             points: tasks.points,
             roundId: tasks.roundId,
+            locationId: tasks.locationId,
           }).from(tasks)
-            .leftJoin(locations, eq(tasks.locationId, locations.id))
             .where(and(eq(tasks.roundId, activeRound.id), eq(tasks.isActive, true)))
             .orderBy(tasks.taskOrder);
-            
-          taskList = taskList.map(t => ({
-            ...t.tasks,
-            startingClue: t.locations?.startingClue
-          }));
+        }
+
+        // Fetch startingClue for the first task's location (if it has one)
+        for (const task of taskList) {
+          task.startingClue = null;
+          if (task.locationId) {
+            const [loc] = await db.select({ startingClue: locations.startingClue })
+              .from(locations)
+              .where(eq(locations.id, task.locationId));
+            task.startingClue = loc?.startingClue || null;
+          }
         }
 
         totalTasks = taskList.length;
