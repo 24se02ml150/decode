@@ -103,19 +103,30 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="mb-6">
-              <label className="label" htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                className="input"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </div>
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="label mb-0" htmlFor="password">Password</label>
+                  {mode === 'team' && (
+                    <button 
+                      type="button" 
+                      onClick={() => alert("Please contact your event organizer or admin. They can instantly generate a new temporary password for your team from their dashboard.")}
+                      className="text-xs text-accent hover:underline focus:outline-none"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  className="input"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
 
             {error && (
               <div className="mb-4 p-3 rounded-lg bg-error-light text-error text-sm font-medium animate-fade-in">
