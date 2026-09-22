@@ -127,6 +127,11 @@ router.post('/:id/start', async (req, res, next) => {
 
     if (!updated) throw new NotFoundError('Round not found.');
 
+    // Auto-activate the parent event if it's not already active
+    await db.update(events)
+      .set({ status: 'active', updatedAt: new Date() })
+      .where(eq(events.id, updated.eventId));
+
     // Pre-assign the first task (taskOrder = 1) for all active teams
     await preassignStartingTasks(roundId, updated.startedAt, updated.totalPausedSeconds);
 
