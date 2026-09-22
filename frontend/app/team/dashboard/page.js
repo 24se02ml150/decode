@@ -41,6 +41,8 @@ export default function TeamDashboard() {
   const tasks = data?.tasks || [];
   const eventStatus = data?.event?.status;
   const progress = currentRound ? (currentRound.teamTasksCompleted / (currentRound.totalTasks || 1)) * 100 : 0;
+  const isRound2 = currentRound?.roundType === 'questions';
+  const round2State = data?.round2State;
 
   // Check qualification status
   const qualifiedRound = data?.rounds?.find(r => r.isQualified === true && r.status === 'completed');
@@ -130,8 +132,43 @@ export default function TeamDashboard() {
         </div>
       )}
 
-      {/* Task List */}
-      {currentRound && currentRound.status === 'active' && (
+      {/* Round 2 CTA */}
+      {currentRound && currentRound.status === 'active' && isRound2 && !eliminatedRound && (
+        <div className="mx-5 mb-4 animate-fade-in-up">
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-text-secondary text-xs font-medium uppercase tracking-wider">Current Round</p>
+                <h2 className="text-lg font-bold text-text-primary">{currentRound.name}</h2>
+              </div>
+              <span className="badge badge-success">Live</span>
+            </div>
+            {round2State && (
+              <div className="mb-4">
+                <div className="flex items-center gap-4 mb-2">
+                  <p className="text-xl font-bold text-text-primary">{round2State.completedQuestions}<span className="text-text-muted text-sm">/{round2State.totalQuestions}</span></p>
+                  <p className="text-text-muted text-xs">Questions</p>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: `${round2State.totalQuestions > 0 ? (round2State.completedQuestions / round2State.totalQuestions) * 100 : 0}%` }}></div>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => router.push('/team/round2')}
+              className="btn btn-primary btn-full btn-lg gap-3 mt-2"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+              </svg>
+              {round2State?.completedQuestions > 0 ? 'Continue Round 2' : 'Start Round 2'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Task List — Round 1 only */}
+      {currentRound && currentRound.status === 'active' && !isRound2 && (
         <div className="mx-5 mb-4">
           <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Tasks</h3>
           <div className="space-y-2 stagger-children">
@@ -183,8 +220,8 @@ export default function TeamDashboard() {
         </div>
       )}
 
-      {/* Scan QR CTA */}
-      {currentRound && currentRound.status === 'active' && !eliminatedRound && (
+      {/* Scan QR CTA — Round 1 only */}
+      {currentRound && currentRound.status === 'active' && !isRound2 && !eliminatedRound && (
         <div className="mx-5 mt-6 mb-4">
           <button
             onClick={() => router.push('/team/scan')}

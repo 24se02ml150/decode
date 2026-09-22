@@ -36,6 +36,8 @@ export const rounds = pgTable('rounds', {
   name: varchar('name', { length: 255 }).notNull(),
   roundNumber: integer('round_number').notNull(),
   description: text('description'),
+  roundType: varchar('round_type', { length: 20 }).notNull().default('qr_hunt'), // 'qr_hunt' | 'questions'
+  assignCount: integer('assign_count'), // how many tasks each team gets randomly assigned, null = all
   status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, active, paused, completed
   qualifyCount: integer('qualify_count'), // number of teams that qualify
   qualifyBy: varchar('qualify_by', { length: 50 }).default('score'), // score, tasks_completed, time, combined
@@ -145,6 +147,31 @@ export const taskAttempts = pgTable('task_attempts', {
   index('task_attempts_team_idx').on(table.teamId),
 ]);
 
+// ─── Team Task Assignments (fixed random assignments per team per round) ───
+export const teamTaskAssignments = pgTable('team_task_assignments', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  roundId: integer('round_id').notNull().references(() => rounds.id, { onDelete: 'cascade' }),
+  taskId: integer('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  assignmentOrder: integer('assignment_order').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('team_task_assignments_unique_idx').on(table.teamId, table.roundId, table.taskId),
+  index('team_task_assignments_team_round_idx').on(table.teamId, table.roundId),
+]);
+
+// ─── Round 2 Config (explanation text + WhatsApp link) ───
+export const round2Config = pgTable('round2_config', {
+  id: serial('id').primaryKey(),
+  roundId: integer('round_id').notNull().references(() => rounds.id, { onDelete: 'cascade' }).unique(),
+  explanationText: text('explanation_text'),
+  whatsappLink: text('whatsapp_link'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('round2_config_round_idx').on(table.roundId),
+]);
+
 // ─── Admin Logs ───
 export const adminLogs = pgTable('admin_logs', {
   id: serial('id').primaryKey(),
@@ -162,6 +189,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   teamRounds: many(teamRounds),
   teamTasks: many(teamTasks),
   taskAttempts: many(taskAttempts),
+  teamTaskAssignments: many(teamTaskAssignments),
 }));
 
 export const eventsRelations = relations(events, ({ many }) => ({
@@ -173,6 +201,8 @@ export const roundsRelations = relations(rounds, ({ one, many }) => ({
   event: one(events, { fields: [rounds.eventId], references: [events.id] }),
   tasks: many(tasks),
   teamRounds: many(teamRounds),
+  teamTaskAssignments: many(teamTaskAssignments),
+  round2Config: one(round2Config, { fields: [rounds.id], references: [round2Config.roundId] }),
 }));
 
 export const locationsRelations = relations(locations, ({ one, many }) => ({
@@ -205,4 +235,14 @@ export const teamTasksRelations = relations(teamTasks, ({ one }) => ({
 export const taskAttemptsRelations = relations(taskAttempts, ({ one }) => ({
   team: one(users, { fields: [taskAttempts.teamId], references: [users.id] }),
   task: one(tasks, { fields: [taskAttempts.taskId], references: [tasks.id] }),
+}));
+
+export const teamTaskAssignmentsRelations = relations(teamTaskAssignments, ({ one }) => ({
+  team: one(users, { fields: [teamTaskAssignments.teamId], references: [users.id] }),
+  round: one(rounds, { fields: [teamTaskAssignments.roundId], references: [rounds.id] }),
+  task: one(tasks, { fields: [teamTaskAssignments.taskId], references: [tasks.id] }),
+}));
+
+export const round2ConfigRelations = relations(round2Config, ({ one }) => ({
+  round: one(rounds, { fields: [round2Config.roundId], references: [rounds.id] }),
 }));

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { submitAnswer, getTaskByToken } from '../../services/task.js';
+import { submitAnswer, getTaskByToken, getRound2State } from '../../services/task.js';
 import { validate } from '../../middleware/validate.js';
 import { z } from 'zod';
 
@@ -19,7 +19,7 @@ router.get('/:token', async (req, res, next) => {
   }
 });
 
-// POST /api/team/tasks/:id/answer — submit answer
+// POST /api/team/tasks/:id/answer — submit answer (works for both Round 1 and Round 2)
 router.post('/:id/answer', validate(answerSchema), async (req, res, next) => {
   try {
     const taskId = parseInt(req.params.id);
@@ -27,6 +27,17 @@ router.post('/:id/answer', validate(answerSchema), async (req, res, next) => {
     
     const result = await submitAnswer(req.user.id, taskId, answer);
     res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/team/tasks/round2/:roundId — get Round 2 question state
+router.get('/round2/:roundId', async (req, res, next) => {
+  try {
+    const roundId = parseInt(req.params.roundId);
+    const state = await getRound2State(req.user.id, roundId);
+    res.json({ success: true, data: state });
   } catch (err) {
     next(err);
   }

@@ -157,6 +157,33 @@ async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS admin_logs_admin_idx ON admin_logs(admin_id);
     CREATE INDEX IF NOT EXISTS admin_logs_created_idx ON admin_logs(created_at);
+
+    -- Add round_type and assign_count to rounds (safe ALTER)
+    ALTER TABLE rounds ADD COLUMN IF NOT EXISTS round_type VARCHAR(20) NOT NULL DEFAULT 'qr_hunt';
+    ALTER TABLE rounds ADD COLUMN IF NOT EXISTS assign_count INTEGER;
+
+    -- Team Task Assignments table
+    CREATE TABLE IF NOT EXISTS team_task_assignments (
+      id SERIAL PRIMARY KEY,
+      team_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      assignment_order INTEGER NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS team_task_assignments_unique_idx ON team_task_assignments(team_id, round_id, task_id);
+    CREATE INDEX IF NOT EXISTS team_task_assignments_team_round_idx ON team_task_assignments(team_id, round_id);
+
+    -- Round 2 Config table
+    CREATE TABLE IF NOT EXISTS round2_config (
+      id SERIAL PRIMARY KEY,
+      round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE UNIQUE,
+      explanation_text TEXT,
+      whatsapp_link TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS round2_config_round_idx ON round2_config(round_id);
   `;
 
   // Execute each statement separately

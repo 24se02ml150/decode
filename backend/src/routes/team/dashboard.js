@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { users, events, rounds, tasks, teamRounds, teamTasks, qrCodes } from '../../db/schema.js';
-import { eq, and, sql, desc, asc } from 'drizzle-orm';
+import { users, events, rounds, tasks, teamRounds, teamTasks, qrCodes, teamTaskAssignments, round2Config } from '../../db/schema.js';
+import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
 
 const router = Router();
 
@@ -56,38 +56,105 @@ router.get('/', async (req, res, next) => {
     // Get tasks for current active round
     let currentTasks = [];
     let totalTasks = 0;
+    let round2State = null;
+
     if (activeRound) {
-      const taskList = await db.select({
-        id: tasks.id,
-        title: tasks.title,
-        taskOrder: tasks.taskOrder,
-        points: tasks.points,
-        roundId: tasks.roundId,
-      }).from(tasks)
-        .where(and(eq(tasks.roundId, activeRound.id), eq(tasks.isActive, true)))
-        .orderBy(tasks.taskOrder);
+      if (activeRound.roundType === 'questions') {
+        // Round 2: Get question completion state
+        const taskList = await db.select({
+          id: tasks.id,
+          title: tasks.title,
+          taskOrder: tasks.taskOrder,
+          points: tasks.points,
+        }).from(tasks)
+          .where(and(eq(tasks.roundId, activeRound.id), eq(tasks.isActive, true)))
+          .orderBy(tasks.taskOrder);
 
-      totalTasks = taskList.length;
+        totalTasks = taskList.length;
 
-      // Get team's task status for each
-      currentTasks = await Promise.all(taskList.map(async (task) => {
-        const [teamTask] = await db.select().from(teamTasks)
-          .where(and(eq(teamTasks.teamId, teamId), eq(teamTasks.taskId, task.id)));
+        // Get completion status
+        const completedCount = await db.select({ count: sql`count(*)` })
+          .from(teamTasks)
+          .innerJoin(tasks, eq(teamTasks.taskId, tasks.id))
+          .where(and(
+            eq(teamTasks.teamId, teamId),
+            eq(teamTasks.isCompleted, true),
+            eq(tasks.roundId, activeRound.id)
+          ));
 
-        // First task is always unlocked
-        const isFirstTask = task.taskOrder === 1;
-        const isUnlocked = isFirstTask || teamTask?.isUnlocked || false;
-
-        return {
-          id: task.id,
-          title: task.title || `Task ${task.taskOrder}`,
-          taskOrder: task.taskOrder,
-          points: task.points,
-          isCompleted: teamTask?.isCompleted || false,
-          isUnlocked,
-          attempts: teamTask?.attempts || 0,
+        round2State = {
+          totalQuestions: totalTasks,
+          completedQuestions: parseInt(completedCount[0]?.count || 0),
         };
-      }));
+      } else {
+        // Round 1 (qr_hunt): Get tasks, filtered by assignments if assignCount is set
+        let taskList;
+
+        if (activeRound.assignCount) {
+          // Get assigned task IDs for this team
+          const assignments = await db.select({
+            taskId: teamTaskAssignments.taskId,
+            assignmentOrder: teamTaskAssignments.assignmentOrder,
+          }).from(teamTaskAssignments)
+            .where(and(
+              eq(teamTaskAssignments.teamId, teamId),
+              eq(teamTaskAssignments.roundId, activeRound.id)
+            ))
+            .orderBy(teamTaskAssignments.assignmentOrder);
+
+          const assignedTaskIds = assignments.map(a => a.taskId);
+
+          if (assignedTaskIds.length > 0) {
+            taskList = await db.select({
+              id: tasks.id,
+              title: tasks.title,
+              taskOrder: tasks.taskOrder,
+              points: tasks.points,
+              roundId: tasks.roundId,
+            }).from(tasks)
+              .where(and(
+                eq(tasks.roundId, activeRound.id),
+                eq(tasks.isActive, true),
+                inArray(tasks.id, assignedTaskIds)
+              ))
+              .orderBy(tasks.taskOrder);
+          } else {
+            taskList = [];
+          }
+        } else {
+          taskList = await db.select({
+            id: tasks.id,
+            title: tasks.title,
+            taskOrder: tasks.taskOrder,
+            points: tasks.points,
+            roundId: tasks.roundId,
+          }).from(tasks)
+            .where(and(eq(tasks.roundId, activeRound.id), eq(tasks.isActive, true)))
+            .orderBy(tasks.taskOrder);
+        }
+
+        totalTasks = taskList.length;
+
+        // Get team's task status for each
+        currentTasks = await Promise.all(taskList.map(async (task) => {
+          const [teamTask] = await db.select().from(teamTasks)
+            .where(and(eq(teamTasks.teamId, teamId), eq(teamTasks.taskId, task.id)));
+
+          // First task in the assigned set is always unlocked
+          const isFirstTask = task.taskOrder === Math.min(...taskList.map(t => t.taskOrder));
+          const isUnlocked = isFirstTask || teamTask?.isUnlocked || false;
+
+          return {
+            id: task.id,
+            title: task.title || `Task ${task.taskOrder}`,
+            taskOrder: task.taskOrder,
+            points: task.points,
+            isCompleted: teamTask?.isCompleted || false,
+            isUnlocked,
+            attempts: teamTask?.attempts || 0,
+          };
+        }));
+      }
     }
 
     const currentProgress = teamRoundProgress.find(tr => tr.roundId === activeRound?.id);
@@ -109,6 +176,7 @@ router.get('/', async (req, res, next) => {
         } : null,
         rounds: roundsWithProgress,
         tasks: currentTasks,
+        round2State,
       },
     });
   } catch (err) {

@@ -53,13 +53,18 @@ export default function ProgressPage() {
                   <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Round {round.roundNumber}</p>
                   <h3 className="text-base font-bold text-text-primary">{round.name}</h3>
                 </div>
-                <span className={`badge ${
+                <div className="flex items-center gap-2">
+                  {round.roundType === 'questions' && (
+                    <span className="badge badge-accent">Questions</span>
+                  )}
+                  <span className={`badge ${
                   round.status === 'active' ? 'badge-success' :
                   round.status === 'completed' ? 'badge-neutral' :
                   'badge-warning'
                 }`}>
                   {round.status === 'active' ? 'Active' : round.status === 'completed' ? 'Ended' : 'Pending'}
                 </span>
+                </div>
               </div>
 
               {/* Score & Progress */}

@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
-import { tasks, teamTasks, teamRounds, taskAttempts, rounds, qrCodes } from '../db/schema.js';
-import { eq, and, sql } from 'drizzle-orm';
+import { tasks, teamTasks, teamRounds, taskAttempts, rounds, qrCodes, teamTaskAssignments, round2Config } from '../db/schema.js';
+import { eq, and, sql, asc } from 'drizzle-orm';
 import { BadRequestError, NotFoundError, ForbiddenError, ConflictError } from '../utils/errors.js';
 
 /**
@@ -31,6 +31,8 @@ export async function submitAnswer(teamId, taskId, answer) {
       isActive: tasks.isActive,
       roundStatus: rounds.status,
       roundId2: rounds.id,
+      roundType: rounds.roundType,
+      assignCount: rounds.assignCount,
     })
     .from(tasks)
     .innerJoin(rounds, eq(tasks.roundId, rounds.id))
@@ -193,23 +195,22 @@ export async function submitAnswer(teamId, taskId, answer) {
     }
 
     // Check if all tasks in round are completed
-    const allTasks = await db
-      .select({ id: tasks.id })
-      .from(tasks)
-      .where(and(eq(tasks.roundId, task.roundId), eq(tasks.isActive, true)));
+    // For rounds with assignCount, only count assigned tasks
+    let totalTaskCount;
+    if (task.assignCount) {
+      const assignedTasks = await db
+        .select({ taskId: teamTaskAssignments.taskId })
+        .from(teamTaskAssignments)
+        .where(and(eq(teamTaskAssignments.teamId, teamId), eq(teamTaskAssignments.roundId, task.roundId)));
+      totalTaskCount = assignedTasks.length;
+    } else {
+      const allTasks = await db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(and(eq(tasks.roundId, task.roundId), eq(tasks.isActive, true)));
+      totalTaskCount = allTasks.length;
+    }
 
-    const completedTasks = await db
-      .select({ id: teamTasks.id })
-      .from(teamTasks)
-      .where(and(
-        eq(teamTasks.teamId, teamId),
-        eq(teamTasks.isCompleted, true),
-      ));
-
-    // Filter to only tasks in this round
-    const completedTaskIds = new Set(completedTasks.map(t => t.id));
-    const allTaskIds = new Set(allTasks.map(t => t.id));
-    
     // Recount properly
     const completedInRound = await db
       .select({ count: sql`count(*)` })
@@ -222,7 +223,7 @@ export async function submitAnswer(teamId, taskId, answer) {
         eq(tasks.isActive, true)
       ));
 
-    const roundComplete = parseInt(completedInRound[0]?.count || 0) >= allTasks.length;
+    const roundComplete = parseInt(completedInRound[0]?.count || 0) >= totalTaskCount;
 
     if (roundComplete) {
       // Mark team_round as completed
@@ -359,5 +360,78 @@ export async function getTaskByToken(teamId, secureToken) {
       completed: parseInt(completedInRound[0]?.count || 0),
       total: parseInt(totalTasks[0]?.count || 0),
     },
+  };
+}
+
+/**
+ * Get Round 2 state for a team — sequential question flow
+ */
+export async function getRound2State(teamId, roundId) {
+  // Get round info
+  const [round] = await db
+    .select()
+    .from(rounds)
+    .where(eq(rounds.id, roundId));
+
+  if (!round) throw new NotFoundError('Round not found.');
+  if (round.roundType !== 'questions') throw new BadRequestError('This is not a question-based round.');
+
+  // Get all active tasks in order
+  const taskList = await db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      taskOrder: tasks.taskOrder,
+      question: tasks.question,
+      points: tasks.points,
+      maxAttempts: tasks.maxAttempts,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.roundId, roundId), eq(tasks.isActive, true)))
+    .orderBy(asc(tasks.taskOrder));
+
+  // Get team's completion status for each task
+  const tasksWithStatus = await Promise.all(taskList.map(async (task) => {
+    const [tt] = await db.select().from(teamTasks)
+      .where(and(eq(teamTasks.teamId, teamId), eq(teamTasks.taskId, task.id)));
+    return {
+      ...task,
+      isCompleted: tt?.isCompleted || false,
+      attempts: tt?.attempts || 0,
+    };
+  }));
+
+  // Find current question (first incomplete)
+  const currentIndex = tasksWithStatus.findIndex(t => !t.isCompleted);
+  const allCompleted = currentIndex === -1;
+
+  // Get round2 config (explanation + whatsapp)
+  let config = null;
+  if (allCompleted) {
+    const [cfg] = await db.select().from(round2Config).where(eq(round2Config.roundId, roundId));
+    config = cfg || null;
+  }
+
+  return {
+    round: {
+      id: round.id,
+      name: round.name,
+      roundNumber: round.roundNumber,
+      status: round.status,
+      roundType: round.roundType,
+    },
+    totalQuestions: taskList.length,
+    completedQuestions: tasksWithStatus.filter(t => t.isCompleted).length,
+    allCompleted,
+    currentQuestion: allCompleted ? null : {
+      id: tasksWithStatus[currentIndex].id,
+      title: tasksWithStatus[currentIndex].title || `Question ${currentIndex + 1}`,
+      question: tasksWithStatus[currentIndex].question,
+      questionNumber: currentIndex + 1,
+      points: tasksWithStatus[currentIndex].points,
+      maxAttempts: tasksWithStatus[currentIndex].maxAttempts,
+      attempts: tasksWithStatus[currentIndex].attempts,
+    },
+    config: allCompleted ? config : null,
   };
 }

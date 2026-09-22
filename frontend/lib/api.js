@@ -113,6 +113,13 @@ export const api = {
     getRoundReport: (roundId, format) => request(`/api/admin/reports/round-results/${roundId}?format=${format || ''}`),
     getTaskReport: (roundId, format) => request(`/api/admin/reports/task-results/${roundId}?format=${format || ''}`),
     getFullReport: (format) => request(`/api/admin/reports/full?format=${format || ''}`),
+
+    // Round 2 Config
+    getRound2Config: (roundId) => request(`/api/admin/round2-config/${roundId}`),
+    updateRound2Config: (roundId, body) => request(`/api/admin/round2-config/${roundId}`, { method: 'PUT', body }),
+
+    // Assignments
+    getRoundAssignments: (roundId) => request(`/api/admin/rounds/${roundId}/assignments`),
   },
 
   // Team
@@ -121,6 +128,7 @@ export const api = {
     getTask: (token) => request(`/api/team/tasks/${token}`),
     submitAnswer: (taskId, answer) => request(`/api/team/tasks/${taskId}/answer`, { method: 'POST', body: { answer } }),
     getProgress: () => request('/api/team/progress'),
+    getRound2: (roundId) => request(`/api/team/tasks/round2/${roundId}`),
   },
 };
 

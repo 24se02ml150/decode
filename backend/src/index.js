@@ -15,6 +15,7 @@ import adminLocationRoutes from './routes/admin/locations.js';
 import adminQRRoutes from './routes/admin/qr.js';
 import adminResultRoutes from './routes/admin/results.js';
 import adminReportRoutes from './routes/admin/reports.js';
+import adminRound2ConfigRoutes from './routes/admin/round2config.js';
 import teamDashboardRoutes from './routes/team/dashboard.js';
 import teamTaskRoutes from './routes/team/tasks.js';
 import teamProgressRoutes from './routes/team/progress.js';
@@ -60,6 +61,7 @@ app.use('/api/admin/locations', authMiddleware, adminMiddleware, adminLocationRo
 app.use('/api/admin/qr', authMiddleware, adminMiddleware, adminQRRoutes);
 app.use('/api/admin/results', authMiddleware, adminMiddleware, adminResultRoutes);
 app.use('/api/admin/reports', authMiddleware, adminMiddleware, adminReportRoutes);
+app.use('/api/admin/round2-config', authMiddleware, adminMiddleware, adminRound2ConfigRoutes);
 
 // Team routes (auth middleware, role checked in routes)
 app.use('/api/team/dashboard', authMiddleware, teamDashboardRoutes);
