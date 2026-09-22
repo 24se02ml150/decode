@@ -38,11 +38,17 @@ export default function ScanPage() {
               // Not a URL, use as-is
             }
 
-            // Stop scanner
-            html5QrCode.stop().catch(() => {});
-            
-            // Navigate to task
-            router.push(`/team/task/${token}`);
+            // Stop scanner, wait for it, then navigate
+            if (html5QrCode) {
+              html5QrCode.stop().then(() => {
+                router.push(`/team/task/${token}`);
+              }).catch(() => {
+                // Navigate anyway if stop fails
+                router.push(`/team/task/${token}`);
+              });
+            } else {
+              router.push(`/team/task/${token}`);
+            }
           },
           () => {} // ignore scan failures
         );
@@ -67,7 +73,13 @@ export default function ScanPage() {
   const handleManualEntry = (e) => {
     e.preventDefault();
     if (manualToken.trim()) {
-      router.push(`/team/task/${manualToken.trim()}`);
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {}).finally(() => {
+          router.push(`/team/task/${manualToken.trim()}`);
+        });
+      } else {
+        router.push(`/team/task/${manualToken.trim()}`);
+      }
     }
   };
 
@@ -76,7 +88,13 @@ export default function ScanPage() {
       {/* Header */}
       <div className="px-5 pt-6 pb-4 flex items-center gap-3">
         <button
-          onClick={() => router.back()}
+          onClick={() => {
+            if (scannerRef.current) {
+              scannerRef.current.stop().catch(() => {}).finally(() => router.back());
+            } else {
+              router.back();
+            }
+          }}
           className="w-9 h-9 rounded-full bg-bg-card border border-border flex items-center justify-center"
         >
           <svg className="w-4 h-4 text-text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
