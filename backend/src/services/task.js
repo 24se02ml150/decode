@@ -70,21 +70,29 @@ export async function submitAnswer(teamId, taskId, answer) {
 
   // 4. Check sequential lock — previous task must be completed
   if (task.taskOrder > 1) {
-    const [prevTask] = await db
+    const [prevTaskExists] = await db
       .select({ id: tasks.id })
       .from(tasks)
       .where(and(
         eq(tasks.roundId, task.roundId),
         eq(tasks.taskOrder, task.taskOrder - 1)
-      ));
+      ))
+      .limit(1);
 
-    if (prevTask) {
-      const [prevTeamTask] = await db
-        .select({ isCompleted: teamTasks.isCompleted })
+    if (prevTaskExists) {
+      const [completedPrevTask] = await db
+        .select({ taskId: teamTasks.taskId })
         .from(teamTasks)
-        .where(and(eq(teamTasks.teamId, teamId), eq(teamTasks.taskId, prevTask.id)));
+        .innerJoin(tasks, eq(teamTasks.taskId, tasks.id))
+        .where(and(
+           eq(teamTasks.teamId, teamId),
+           eq(teamTasks.isCompleted, true),
+           eq(tasks.roundId, task.roundId),
+           eq(tasks.taskOrder, task.taskOrder - 1)
+        ))
+        .limit(1);
 
-      if (!prevTeamTask?.isCompleted) {
+      if (!completedPrevTask) {
         throw new ForbiddenError('Complete the previous task first.');
       }
     }
@@ -510,18 +518,29 @@ export async function getTaskByToken(teamId, secureToken) {
 
   // Check sequential access
   if (task.taskOrder > 1) {
-    const [prevTask] = await db
+    const [prevTaskExists] = await db
       .select({ id: tasks.id })
       .from(tasks)
-      .where(and(eq(tasks.roundId, task.roundId), eq(tasks.taskOrder, task.taskOrder - 1)));
+      .where(and(
+        eq(tasks.roundId, task.roundId),
+        eq(tasks.taskOrder, task.taskOrder - 1)
+      ))
+      .limit(1);
 
-    if (prevTask) {
-      const [prevTeamTask] = await db
-        .select({ isCompleted: teamTasks.isCompleted })
+    if (prevTaskExists) {
+      const [completedPrevTask] = await db
+        .select({ taskId: teamTasks.taskId })
         .from(teamTasks)
-        .where(and(eq(teamTasks.teamId, teamId), eq(teamTasks.taskId, prevTask.id)));
+        .innerJoin(tasks, eq(teamTasks.taskId, tasks.id))
+        .where(and(
+           eq(teamTasks.teamId, teamId),
+           eq(teamTasks.isCompleted, true),
+           eq(tasks.roundId, task.roundId),
+           eq(tasks.taskOrder, task.taskOrder - 1)
+        ))
+        .limit(1);
 
-      if (!prevTeamTask?.isCompleted) {
+      if (!completedPrevTask) {
         throw new ForbiddenError('Complete the previous task first.');
       }
     }
