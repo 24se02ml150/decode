@@ -127,10 +127,8 @@ router.post('/:id/start', async (req, res, next) => {
 
     if (!updated) throw new NotFoundError('Round not found.');
 
-    // Auto-generate random task assignments for qr_hunt rounds with assignCount
-    if (updated.roundType === 'qr_hunt' && updated.assignCount) {
-      await generateAssignments(roundId, updated.assignCount, updated.eventId);
-    }
+    // Pre-assign the first task (taskOrder = 1) for all active teams
+    await preassignStartingTasks(roundId, updated.startedAt, updated.totalPausedSeconds);
 
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -138,47 +136,114 @@ router.post('/:id/start', async (req, res, next) => {
   }
 });
 
-// Helper: Generate random task assignments for all active teams
-async function generateAssignments(roundId, assignCount, eventId) {
-  // Get all active tasks in this round
-  const taskList = await db.select({ id: tasks.id })
-    .from(tasks)
-    .where(and(eq(tasks.roundId, roundId), eq(tasks.isActive, true)))
-    .orderBy(tasks.taskOrder);
-
-  if (taskList.length === 0) return;
-
+// Helper: Pre-assign the starting task (taskOrder = 1) for all teams
+async function preassignStartingTasks(roundId, roundStartedAt, roundPausedSnapshot) {
   // Get all active teams
   const teamList = await db.select({ id: users.id })
     .from(users)
     .where(and(eq(users.role, 'team'), eq(users.isActive, true)));
 
-  const count = Math.min(assignCount, taskList.length);
+  if (teamList.length === 0) return;
 
-  for (const team of teamList) {
-    // Check if team already has assignments for this round
-    const existing = await db.select({ id: teamTaskAssignments.id })
-      .from(teamTaskAssignments)
-      .where(and(eq(teamTaskAssignments.teamId, team.id), eq(teamTaskAssignments.roundId, roundId)))
-      .limit(1);
+  // Get tasks with taskOrder = 1
+  const startingTasks = await db.select({
+    id: tasks.id,
+    locationId: tasks.locationId,
+  })
+    .from(tasks)
+    .where(and(eq(tasks.roundId, roundId), eq(tasks.taskOrder, 1), eq(tasks.isActive, true)));
 
-    if (existing.length > 0) continue; // Already assigned, skip
+  if (startingTasks.length === 0) return;
 
-    // Shuffle and pick random tasks
-    const shuffled = [...taskList].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, count);
-
-    // Insert assignments with order
-    for (let i = 0; i < selected.length; i++) {
-      await db.insert(teamTaskAssignments).values({
-        teamId: team.id,
-        roundId,
-        taskId: selected[i].id,
-        assignmentOrder: i + 1,
-      });
+  // Find out if they belong to a pool location
+  // We need to group tasks by location and check taskPoolMode
+  const locationIds = startingTasks.map(t => t.locationId).filter(id => id != null);
+  let locationModes = new Map();
+  
+  if (locationIds.length > 0) {
+    const locs = await db.select({ id: locations.id, taskPoolMode: locations.taskPoolMode })
+      .from(locations)
+      .where(inArray(locations.id, locationIds));
+    for (const l of locs) {
+      locationModes.set(l.id, l.taskPoolMode);
     }
   }
+
+  // Find all location pools for taskOrder = 1 tasks
+  const poolLocations = Array.from(locationModes.entries())
+    .filter(([_, mode]) => mode === 'pool')
+    .map(([id]) => id);
+
+  let poolTasksMap = new Map(); // locationId -> array of taskIds
+  if (poolLocations.length > 0) {
+    const poolMappings = await db.select({ locationId: locationTaskPool.locationId, taskId: locationTaskPool.taskId })
+      .from(locationTaskPool)
+      .where(inArray(locationTaskPool.locationId, poolLocations));
+    for (const p of poolMappings) {
+      if (!poolTasksMap.has(p.locationId)) poolTasksMap.set(p.locationId, []);
+      poolTasksMap.get(p.locationId).push(p.taskId);
+    }
+  }
+
+  // Pre-assign for each team
+  for (const team of teamList) {
+    // Check if team already has an assignment for taskOrder = 1
+    const existing = await db.select({ id: teamTaskAssignments.id })
+      .from(teamTaskAssignments)
+      .where(and(
+        eq(teamTaskAssignments.teamId, team.id), 
+        eq(teamTaskAssignments.roundId, roundId),
+        eq(teamTaskAssignments.assignmentOrder, 1)
+      ))
+      .limit(1);
+
+    if (existing.length > 0) continue; // Already assigned
+
+    // Pick a starting location (if multiple starting locations exist, we pick one randomly or sequentially, but usually there's one)
+    // For simplicity, we just pick the location of the first startingTask
+    const baseTask = startingTasks[0];
+    const locId = baseTask.locationId;
+    let selectedTaskId = baseTask.id;
+
+    if (locId && locationModes.get(locId) === 'pool') {
+      // Run pool assignment logic for this location
+      const poolTaskIds = poolTasksMap.get(locId) || [];
+      if (poolTaskIds.length > 0) {
+        // Find global counts for these tasks
+        const globalAssignments = await db
+          .select({ taskId: teamTaskAssignments.taskId, count: sql`count(*)` })
+          .from(teamTaskAssignments)
+          .where(inArray(teamTaskAssignments.taskId, poolTaskIds))
+          .groupBy(teamTaskAssignments.taskId);
+          
+        const countsMap = new Map(globalAssignments.map(g => [g.taskId, parseInt(g.count)]));
+        
+        let minCount = Infinity;
+        for (const tId of poolTaskIds) {
+          const count = countsMap.get(tId) || 0;
+          if (count < minCount) {
+            minCount = count;
+            selectedTaskId = tId;
+          }
+        }
+      }
+    }
+
+    // Insert assignment
+    await db.insert(teamTaskAssignments).values({
+      teamId: team.id,
+      roundId,
+      taskId: selectedTaskId,
+      locationId: locId,
+      assignmentOrder: 1,
+      assignedAt: roundStartedAt,
+      assignedAtPausedSnapshot: roundPausedSnapshot,
+    });
+  }
 }
+
+// Helper: Generate random task assignments for all active teams
+// (Removed old generateAssignments as it was replaced by preassignStartingTasks)
 
 // GET /api/admin/rounds/:id/assignments
 router.get('/:id/assignments', async (req, res, next) => {
@@ -228,11 +293,37 @@ router.get('/:id/assignments', async (req, res, next) => {
 router.post('/:id/pause', async (req, res, next) => {
   try {
     const [updated] = await db.update(rounds)
-      .set({ status: 'paused', updatedAt: new Date() })
+      .set({ status: 'paused', lastPausedAt: new Date(), updatedAt: new Date() })
       .where(eq(rounds.id, parseInt(req.params.id)))
       .returning();
 
     if (!updated) throw new NotFoundError('Round not found.');
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/rounds/:id/resume
+router.post('/:id/resume', async (req, res, next) => {
+  try {
+    const roundId = parseInt(req.params.id);
+    const [round] = await db.select().from(rounds).where(eq(rounds.id, roundId));
+    if (!round) throw new NotFoundError('Round not found.');
+
+    const updates = { status: 'active', updatedAt: new Date() };
+
+    if (round.lastPausedAt) {
+      const pausedDurationSeconds = Math.floor((new Date().getTime() - round.lastPausedAt.getTime()) / 1000);
+      updates.totalPausedSeconds = round.totalPausedSeconds + pausedDurationSeconds;
+      updates.lastPausedAt = null;
+    }
+
+    const [updated] = await db.update(rounds)
+      .set(updates)
+      .where(eq(rounds.id, roundId))
+      .returning();
+
     res.json({ success: true, data: updated });
   } catch (err) {
     next(err);

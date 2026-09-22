@@ -93,6 +93,7 @@ export const api = {
     deleteRound: (id) => request(`/api/admin/rounds/${id}`, { method: 'DELETE' }),
     startRound: (id) => request(`/api/admin/rounds/${id}/start`, { method: 'POST' }),
     pauseRound: (id) => request(`/api/admin/rounds/${id}/pause`, { method: 'POST' }),
+    resumeRound: (id) => request(`/api/admin/rounds/${id}/resume`, { method: 'POST' }),
     endRound: (id) => request(`/api/admin/rounds/${id}/end`, { method: 'POST' }),
 
     // Tasks

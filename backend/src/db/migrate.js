@@ -55,11 +55,16 @@ async function migrate() {
       time_limit INTEGER,
       started_at TIMESTAMP,
       ended_at TIMESTAMP,
+      last_paused_at TIMESTAMP,
+      total_paused_seconds INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
     CREATE UNIQUE INDEX IF NOT EXISTS rounds_event_round_idx ON rounds(event_id, round_number);
     CREATE INDEX IF NOT EXISTS rounds_event_id_idx ON rounds(event_id);
+    
+    ALTER TABLE rounds ADD COLUMN IF NOT EXISTS last_paused_at TIMESTAMP;
+    ALTER TABLE rounds ADD COLUMN IF NOT EXISTS total_paused_seconds INTEGER NOT NULL DEFAULT 0;
 
     -- Locations table
     CREATE TABLE IF NOT EXISTS locations (
@@ -71,8 +76,9 @@ async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS locations_event_id_idx ON locations(event_id);
 
-    -- Alter locations to add task_pool_mode
+    -- Alter locations to add new columns
     ALTER TABLE locations ADD COLUMN IF NOT EXISTS task_pool_mode VARCHAR(20) NOT NULL DEFAULT 'single';
+    ALTER TABLE locations ADD COLUMN IF NOT EXISTS starting_clue TEXT;
 
     -- Location Task Pool table
     CREATE TABLE IF NOT EXISTS location_task_pool (
@@ -204,6 +210,8 @@ async function migrate() {
     ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
     ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS response_time_seconds INTEGER;
     ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS scan_offset_seconds INTEGER;
+    ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS assigned_at_paused_snapshot INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS completed_at_paused_snapshot INTEGER;
     
     CREATE UNIQUE INDEX IF NOT EXISTS team_task_assignments_unique_idx ON team_task_assignments(team_id, round_id, task_id);
     CREATE INDEX IF NOT EXISTS team_task_assignments_team_round_idx ON team_task_assignments(team_id, round_id);

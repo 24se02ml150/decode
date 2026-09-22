@@ -206,6 +206,12 @@ export default function TeamDashboard() {
                     {task.isCompleted ? 'Completed' : task.isUnlocked ? 'Scan QR to start' : 'Locked'}
                     {task.points > 0 && ` · ${task.points} pts`}
                   </p>
+                  {task.startingClue && (
+                    <div className="mt-2 p-2 bg-accent-light/30 rounded border border-accent/20">
+                      <p className="text-xs font-semibold text-accent mb-0.5">Starting Clue</p>
+                      <p className="text-xs text-text-secondary">{task.startingClue}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Arrow */}

@@ -33,6 +33,7 @@ export async function submitAnswer(teamId, taskId, answer) {
       roundId2: rounds.id,
       roundType: rounds.roundType,
       assignCount: rounds.assignCount,
+      totalPausedSeconds: rounds.totalPausedSeconds,
     })
     .from(tasks)
     .innerJoin(rounds, eq(tasks.roundId, rounds.id))
@@ -143,7 +144,11 @@ export async function submitAnswer(teamId, taskId, answer) {
     
     // Update team_task_assignments timing if assignment exists
     const [assignment] = await db
-      .select({ id: teamTaskAssignments.id, assignedAt: teamTaskAssignments.assignedAt })
+      .select({ 
+        id: teamTaskAssignments.id, 
+        assignedAt: teamTaskAssignments.assignedAt,
+        assignedAtPausedSnapshot: teamTaskAssignments.assignedAtPausedSnapshot
+      })
       .from(teamTaskAssignments)
       .where(and(
         eq(teamTaskAssignments.teamId, teamId),
@@ -152,11 +157,16 @@ export async function submitAnswer(teamId, taskId, answer) {
       ));
       
     if (assignment) {
+      const rawSeconds = Math.floor((now.getTime() - assignment.assignedAt.getTime()) / 1000);
+      const pausedSeconds = task.totalPausedSeconds - (assignment.assignedAtPausedSnapshot || 0);
+      const netSeconds = Math.max(0, rawSeconds - pausedSeconds);
+
       await db
         .update(teamTaskAssignments)
         .set({
           completedAt: now,
-          responseTimeSeconds: Math.floor((now.getTime() - assignment.assignedAt.getTime()) / 1000)
+          completedAtPausedSnapshot: task.totalPausedSeconds,
+          responseTimeSeconds: netSeconds
         })
         .where(eq(teamTaskAssignments.id, assignment.id));
     }
@@ -412,6 +422,39 @@ export async function getTaskByToken(teamId, secureToken) {
         
       const nextOrder = (parseInt(maxOrder?.max) || 0) + 1;
       
+      // Calculate scan offset correctly using paused snapshots
+      let rawOffset = 0;
+      let pausedOffset = 0;
+      
+      // We need the previous task's completedAt to calculate the interval
+      if (nextOrder > 1) {
+        const [prevAssignment] = await tx
+          .select({ 
+             completedAt: teamTaskAssignments.completedAt,
+             completedAtPausedSnapshot: teamTaskAssignments.completedAtPausedSnapshot
+          })
+          .from(teamTaskAssignments)
+          .where(and(
+             eq(teamTaskAssignments.teamId, teamId),
+             eq(teamTaskAssignments.roundId, activeRound.id),
+             eq(teamTaskAssignments.assignmentOrder, nextOrder - 1)
+          ));
+          
+        if (prevAssignment && prevAssignment.completedAt) {
+          rawOffset = Math.floor((Date.now() - prevAssignment.completedAt.getTime()) / 1000);
+          pausedOffset = activeRound.totalPausedSeconds - (prevAssignment.completedAtPausedSnapshot || 0);
+        } else {
+          // Fallback if previous assignment missing
+          rawOffset = Math.floor((Date.now() - activeRound.startedAt.getTime()) / 1000);
+          pausedOffset = activeRound.totalPausedSeconds;
+        }
+      } else {
+        rawOffset = Math.floor((Date.now() - activeRound.startedAt.getTime()) / 1000);
+        pausedOffset = activeRound.totalPausedSeconds;
+      }
+      
+      const netOffset = Math.max(0, rawOffset - pausedOffset);
+
       await tx.insert(teamTaskAssignments).values({
         teamId,
         roundId: activeRound.id,
@@ -419,7 +462,8 @@ export async function getTaskByToken(teamId, secureToken) {
         locationId: qr.locationId,
         assignmentOrder: nextOrder,
         assignedAt: new Date(),
-        scanOffsetSeconds: Math.floor((Date.now() - activeRound.startedAt.getTime()) / 1000),
+        assignedAtPausedSnapshot: activeRound.totalPausedSeconds,
+        scanOffsetSeconds: netOffset,
       });
 
       return selectedTaskId;
@@ -581,6 +625,8 @@ export async function getRound2State(teamId, roundId) {
       roundNumber: round.roundNumber,
       status: round.status,
       roundType: round.roundType,
+      startedAt: round.startedAt,
+      totalPausedSeconds: round.totalPausedSeconds,
     },
     totalQuestions: taskList.length,
     completedQuestions: tasksWithStatus.filter(t => t.isCompleted).length,

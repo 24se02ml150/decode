@@ -117,7 +117,13 @@ router.get('/', async (req, res, next) => {
                 eq(tasks.isActive, true),
                 inArray(tasks.id, assignedTaskIds)
               ))
+              .leftJoin(locations, eq(tasks.locationId, locations.id))
               .orderBy(tasks.taskOrder);
+              
+            taskList = taskList.map(t => ({
+              ...t.tasks,
+              startingClue: t.locations?.startingClue
+            }));
           } else {
             taskList = [];
           }
@@ -129,8 +135,14 @@ router.get('/', async (req, res, next) => {
             points: tasks.points,
             roundId: tasks.roundId,
           }).from(tasks)
+            .leftJoin(locations, eq(tasks.locationId, locations.id))
             .where(and(eq(tasks.roundId, activeRound.id), eq(tasks.isActive, true)))
             .orderBy(tasks.taskOrder);
+            
+          taskList = taskList.map(t => ({
+            ...t.tasks,
+            startingClue: t.locations?.startingClue
+          }));
         }
 
         totalTasks = taskList.length;
@@ -152,6 +164,7 @@ router.get('/', async (req, res, next) => {
             isCompleted: teamTask?.isCompleted || false,
             isUnlocked,
             attempts: teamTask?.attempts || 0,
+            startingClue: isFirstTask && !teamTask?.isCompleted ? task.startingClue : null,
           };
         }));
       }

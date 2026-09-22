@@ -46,6 +46,8 @@ export const rounds = pgTable('rounds', {
   timeLimit: integer('time_limit'), // in minutes, null = no limit
   startedAt: timestamp('started_at'),
   endedAt: timestamp('ended_at'),
+  lastPausedAt: timestamp('last_paused_at'),
+  totalPausedSeconds: integer('total_paused_seconds').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
@@ -59,6 +61,7 @@ export const locations = pgTable('locations', {
   eventId: integer('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  startingClue: text('starting_clue'),
   taskPoolMode: varchar('task_pool_mode', { length: 20 }).notNull().default('single'), // 'single' | 'pool'
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => [
@@ -175,6 +178,8 @@ export const teamTaskAssignments = pgTable('team_task_assignments', {
   completedAt: timestamp('completed_at'),
   responseTimeSeconds: integer('response_time_seconds'),
   scanOffsetSeconds: integer('scan_offset_seconds'),
+  assignedAtPausedSnapshot: integer('assigned_at_paused_snapshot').notNull().default(0),
+  completedAtPausedSnapshot: integer('completed_at_paused_snapshot'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('team_task_assignments_unique_idx').on(table.teamId, table.roundId, table.taskId),
