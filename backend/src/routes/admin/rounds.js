@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { rounds, tasks, teamRounds, users, teamTaskAssignments } from '../../db/schema.js';
-import { eq, and, sql } from 'drizzle-orm';
+import { rounds, tasks, teamRounds, users, teamTaskAssignments, events, locations, locationTaskPool } from '../../db/schema.js';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { validate } from '../../middleware/validate.js';
 import { NotFoundError, BadRequestError } from '../../utils/errors.js';
 import { calculateQualification } from '../../services/qualification.js';
