@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -35,14 +35,23 @@ export default function ChangePasswordPage() {
     setLoading(true);
     
     try {
-      await api.auth.changePassword({
+      const res = await api.auth.changePassword({
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
         confirmPassword: form.confirmPassword
       });
       
-      // Force reload auth context and navigate to dashboard
-      window.location.href = '/team/dashboard';
+      if (res.data?.token) {
+        localStorage.setItem('token', res.data.token);
+      }
+      
+      // Update auth context synchronously
+      if (typeof checkAuth === 'function') {
+        await checkAuth();
+      }
+      
+      // Navigate seamlessly to the dashboard
+      router.push('/team/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to update password');
     } finally {

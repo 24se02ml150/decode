@@ -145,7 +145,34 @@ router.post('/change-password', authMiddleware, validate(changePasswordSchema), 
       })
       .where(eq(users.id, req.user.id));
       
-    res.json({ success: true, message: 'Password updated successfully' });
+    // Generate new token reflecting updated state
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        teamId: user.teamId,
+        teamName: user.teamName,
+        mustResetPassword: false,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+      
+    res.json({ 
+      success: true, 
+      message: 'Password updated successfully',
+      data: {
+        token,
+        user: {
+          id: user.id,
+          role: user.role,
+          teamId: user.teamId,
+          teamName: user.teamName,
+          email: user.email,
+          mustResetPassword: false,
+        }
+      }
+    });
   } catch (err) {
     next(err);
   }
