@@ -151,4 +151,46 @@ router.post('/change-password', authMiddleware, validate(changePasswordSchema), 
   }
 });
 
+const updatePasswordUnauthSchema = z.object({
+  teamId: z.string().min(1, 'Team ID is required'),
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(1, 'New password is required'),
+  confirmPassword: z.string().min(1, 'Confirm password is required'),
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "New passwords don't match",
+  path: ['confirmPassword']
+});
+
+// POST /api/auth/update-password (Unauthenticated)
+router.post('/update-password', validate(updatePasswordUnauthSchema), async (req, res, next) => {
+  try {
+    const { teamId, currentPassword, newPassword } = req.validatedBody;
+    
+    // Get user
+    const [user] = await db.select().from(users).where(eq(users.teamId, teamId.toUpperCase()));
+    if (!user) throw new UnauthorizedError('Invalid Team ID or password.');
+    if (user.role !== 'team') throw new UnauthorizedError('Only teams can use this feature.');
+    
+    // Verify current password
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      throw new BadRequestError('Current password is incorrect.');
+    }
+    
+    // Hash new password and update
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    await db.update(users)
+      .set({ 
+        password: hashedNewPassword, 
+        mustResetPassword: false,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, user.id));
+      
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

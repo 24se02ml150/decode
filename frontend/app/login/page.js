@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -107,13 +108,12 @@ export default function LoginPage() {
                 <div className="flex justify-between items-center mb-1">
                   <label className="label mb-0" htmlFor="password">Password</label>
                   {mode === 'team' && (
-                    <button 
-                      type="button" 
-                      onClick={() => alert("Please contact your event organizer or admin. They can instantly generate a new temporary password for your team from their dashboard.")}
+                    <Link 
+                      href="/change-password"
                       className="text-xs text-accent hover:underline focus:outline-none"
                     >
-                      Forgot Password?
-                    </button>
+                      Change Password?
+                    </Link>
                   )}
                 </div>
                 <input
