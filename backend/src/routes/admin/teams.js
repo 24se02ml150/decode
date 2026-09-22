@@ -274,6 +274,10 @@ router.patch('/:id', validate(updateTeamSchema), async (req, res, next) => {
   try {
     const updates = { ...req.validatedBody, updatedAt: new Date() };
     
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    }
+    
     const [updated] = await db.update(users)
       .set(updates)
       .where(and(eq(users.id, parseInt(req.params.id)), eq(users.role, 'team')))
@@ -292,27 +296,7 @@ router.patch('/:id', validate(updateTeamSchema), async (req, res, next) => {
   }
 });
 
-// POST /api/admin/teams/:id/reset-password
-router.post('/:id/reset-password', async (req, res, next) => {
-  try {
-    const newPassword = generatePassword();
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    const [updated] = await db.update(users)
-      .set({ password: hashedPassword, updatedAt: new Date() })
-      .where(and(eq(users.id, parseInt(req.params.id)), eq(users.role, 'team')))
-      .returning({ id: users.id, teamId: users.teamId, teamName: users.teamName });
-
-    if (!updated) throw new NotFoundError('Team not found.');
-
-    res.json({
-      success: true,
-      data: { ...updated, plainPassword: newPassword },
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
 // DELETE /api/admin/teams/:id
 router.delete('/:id', async (req, res, next) => {
