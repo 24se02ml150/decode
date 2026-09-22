@@ -26,6 +26,10 @@ async function migrate() {
     CREATE UNIQUE INDEX IF NOT EXISTS users_team_id_idx ON users(team_id);
     CREATE INDEX IF NOT EXISTS users_role_idx ON users(role);
 
+    -- Alter users table to add new columns (safe ALTER)
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS leader_name VARCHAR(255);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS must_reset_password BOOLEAN NOT NULL DEFAULT false;
+
     -- Events table
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
