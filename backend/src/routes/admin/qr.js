@@ -67,6 +67,7 @@ router.post('/:taskId/regenerate', async (req, res, next) => {
 
     const [newQr] = await db.insert(qrCodes).values({
       taskId,
+      locationId: task.locationId,
       secureToken,
       qrDataUrl,
     }).returning();
