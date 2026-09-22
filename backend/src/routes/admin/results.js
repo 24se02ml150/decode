@@ -86,20 +86,7 @@ router.get('/live-progress', async (req, res, next) => {
         .where(eq(teamRounds.roundId, roundId))
         .orderBy(desc(teamRounds.score));
         
-      // Fetch assignment counts for each team
-      const assignmentCounts = await db.select({
-        teamId: teamTaskAssignments.teamId,
-        count: sql`count(*)`
-      }).from(teamTaskAssignments)
-        .where(eq(teamTaskAssignments.roundId, roundId))
-        .groupBy(teamTaskAssignments.teamId);
-
-      const countMap = new Map(assignmentCounts.map(a => [a.teamId, parseInt(a.count)]));
-
-      teamProgress = teamProgressRaw.map(t => ({
-        ...t,
-        totalTasks: countMap.get(t.teamId) || 0
-      }));
+      teamProgress = teamProgressRaw;
     } else {
       // Get all teams with latest round progress
       teamProgress = await db.select({
@@ -113,8 +100,9 @@ router.get('/live-progress', async (req, res, next) => {
     // Get total tasks for the round
     let totalTasks = 0;
     if (roundId) {
+      const [r] = await db.select().from(rounds).where(eq(rounds.id, roundId));
       const [tc] = await db.select({ count: sql`count(*)` }).from(tasks).where(eq(tasks.roundId, roundId));
-      totalTasks = parseInt(tc.count);
+      totalTasks = r?.assignCount || parseInt(tc.count) || 0;
     }
 
     res.json({

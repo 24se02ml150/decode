@@ -50,7 +50,6 @@ router.get('/', async (req, res, next) => {
         } else {
           taskList = [];
         }
-        totalTaskCount = taskList.length;
       } else {
         taskList = await db.select({
           id: tasks.id,
@@ -60,9 +59,9 @@ router.get('/', async (req, res, next) => {
         }).from(tasks)
           .where(and(eq(tasks.roundId, round.id), eq(tasks.isActive, true)))
           .orderBy(tasks.taskOrder);
-
-        totalTaskCount = taskList.length;
       }
+
+      totalTaskCount = round.assignCount || taskList.length;
 
       const tasksWithStatus = await Promise.all(taskList.map(async (task) => {
         const [tt] = await db.select().from(teamTasks)

@@ -40,13 +40,13 @@ export default function TeamDashboard() {
   const currentRound = data?.currentRound;
   const tasks = data?.tasks || [];
   const eventStatus = data?.event?.status;
-  const progress = currentRound ? (currentRound.teamTasksCompleted / (currentRound.totalTasks || 1)) * 100 : 0;
-  const isRound2 = currentRound?.roundType === 'questions';
-  const round2State = data?.round2State;
-
-  // Check qualification status
+  const isQuestionsRound = currentRound?.roundType === 'questions';
   const qualifiedRound = data?.rounds?.find(r => r.isQualified === true && r.status === 'completed');
   const eliminatedRound = data?.rounds?.find(r => r.isQualified === false && r.status === 'completed');
+
+  const total = currentRound?.totalTasks > 0 ? currentRound.totalTasks : 1;
+  const progress = currentRound ? (currentRound.teamTasksCompleted / total) * 100 : 0;
+  const questionsState = data?.round2State;
 
   return (
     <div className="pb-4">
@@ -132,8 +132,8 @@ export default function TeamDashboard() {
         </div>
       )}
 
-      {/* Round 2 CTA */}
-      {currentRound && currentRound.status === 'active' && isRound2 && !eliminatedRound && (
+      {/* Questions Round CTA */}
+      {currentRound && eventStatus === 'active' && isQuestionsRound && !eliminatedRound && (
         <div className="mx-5 mb-4 animate-fade-in-up">
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
@@ -143,8 +143,8 @@ export default function TeamDashboard() {
               </div>
               <span className="badge badge-success">Live</span>
             </div>
-            {round2State && (
-              round2State?.allCompleted ? (
+            {questionsState && (
+              questionsState?.allCompleted ? (
                 <div className="flex flex-col items-center justify-center py-4 text-center">
                   <div className="w-16 h-16 rounded-full bg-success-light flex items-center justify-center mb-3">
                     <svg className="w-8 h-8 text-success animate-checkmark" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

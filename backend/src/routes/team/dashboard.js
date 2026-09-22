@@ -157,13 +157,7 @@ router.get('/', async (req, res, next) => {
           }
         }
 
-        const [assignmentCountRes] = await db.select({ count: sql`count(*)` })
-          .from(teamTaskAssignments)
-          .where(and(
-            eq(teamTaskAssignments.teamId, teamId),
-            eq(teamTaskAssignments.roundId, activeRound.id)
-          ));
-        totalTasks = parseInt(assignmentCountRes.count) || 0;
+        totalTasks = activeRound.assignCount || taskList.length;
 
         // Get team's task status for each
         currentTasks = await Promise.all(taskList.map(async (task) => {
