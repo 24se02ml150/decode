@@ -102,6 +102,18 @@ export default function EventConfigPage({ params }) {
     }
   };
 
+  const handleRoundAction = async (roundId, action) => {
+    if (!confirm(`Are you sure you want to ${action} this round?`)) return;
+    try {
+      if (action === 'start') {
+        await api.admin.startRound(roundId);
+        loadData();
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-text-muted">Loading configuration...</div>;
 
   return (
@@ -159,6 +171,15 @@ export default function EventConfigPage({ params }) {
                   >
                     Manage Tasks
                   </Link>
+                  {round.status === 'pending' && (
+                    <button 
+                      onClick={() => handleRoundAction(round.id, 'start')}
+                      className="btn btn-success btn-sm"
+                      title="Start Round"
+                    >
+                      Start Round
+                    </button>
+                  )}
                   <button 
                     onClick={() => openEditRound(round)}
                     className="btn btn-secondary btn-sm p-2"
