@@ -204,7 +204,7 @@ router.post('/', validate(createTeamSchema), async (req, res, next) => {
     const { teamName, teamId: customTeamId, password: customPassword } = req.validatedBody;
     
     const teamId = customTeamId?.toUpperCase() || generateTeamId();
-    const password = customPassword || generatePassword();
+    const password = customPassword || 'Campus@2026';
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Check duplicate
@@ -216,6 +216,7 @@ router.post('/', validate(createTeamSchema), async (req, res, next) => {
       teamName,
       password: hashedPassword,
       role: 'team',
+      mustResetPassword: true,
     }).returning({
       id: users.id,
       teamId: users.teamId,
@@ -239,11 +240,11 @@ router.post('/bulk', validate(bulkCreateSchema), async (req, res, next) => {
   try {
     const { count: teamCount, prefix } = req.validatedBody;
     const createdTeams = [];
+    const password = 'Campus@2026';
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     for (let i = 0; i < teamCount; i++) {
       const teamId = generateTeamId();
-      const password = generatePassword();
-      const hashedPassword = await bcrypt.hash(password, 12);
       const teamName = `${prefix} ${i + 1}`;
 
       const [newTeam] = await db.insert(users).values({
@@ -251,6 +252,7 @@ router.post('/bulk', validate(bulkCreateSchema), async (req, res, next) => {
         teamName,
         password: hashedPassword,
         role: 'team',
+        mustResetPassword: true,
       }).returning({
         id: users.id,
         teamId: users.teamId,
