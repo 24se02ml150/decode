@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { users, rounds, tasks, teamRounds, teamTasks, taskAttempts } from '../../db/schema.js';
+import { users, rounds, tasks, teamRounds, teamTasks, taskAttempts, teamTaskAssignments } from '../../db/schema.js';
 import { eq, and, sql, desc } from 'drizzle-orm';
 
 const router = Router();
@@ -90,14 +90,21 @@ router.get('/task-results/:roundId', async (req, res, next) => {
       correctAttempts: teamTasks.correctAttempts,
       wrongAttempts: teamTasks.wrongAttempts,
       completedAt: teamTasks.completedAt,
+      scanOffsetSeconds: teamTaskAssignments.scanOffsetSeconds,
+      responseTimeSeconds: teamTaskAssignments.responseTimeSeconds,
     }).from(teamTasks)
       .innerJoin(users, eq(teamTasks.teamId, users.id))
       .innerJoin(tasks, eq(teamTasks.taskId, tasks.id))
+      .leftJoin(teamTaskAssignments, and(
+        eq(teamTaskAssignments.teamId, teamTasks.teamId),
+        eq(teamTaskAssignments.taskId, teamTasks.taskId),
+        eq(teamTaskAssignments.roundId, tasks.roundId)
+      ))
       .where(eq(tasks.roundId, roundId))
       .orderBy(users.teamName, tasks.taskOrder);
 
     if (req.query.format === 'csv') {
-      const csv = toCSV(['teamId', 'teamName', 'taskOrder', 'taskTitle', 'isCompleted', 'attempts', 'correctAttempts', 'wrongAttempts', 'completedAt'], taskResults);
+      const csv = toCSV(['teamId', 'teamName', 'taskOrder', 'taskTitle', 'isCompleted', 'attempts', 'correctAttempts', 'wrongAttempts', 'completedAt', 'scanOffsetSeconds', 'responseTimeSeconds'], taskResults);
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="round_${roundId}_task_results.csv"`);
       return res.send(csv);

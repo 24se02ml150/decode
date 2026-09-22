@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
-import { tasks, teamTasks, teamRounds, taskAttempts, rounds, qrCodes, teamTaskAssignments, round2Config } from '../db/schema.js';
-import { eq, and, sql, asc } from 'drizzle-orm';
+import { tasks, teamTasks, teamRounds, taskAttempts, rounds, qrCodes, teamTaskAssignments, round2Config, locations, locationTaskPool } from '../db/schema.js';
+import { eq, and, sql, asc, inArray, notInArray, isNull } from 'drizzle-orm';
 import { BadRequestError, NotFoundError, ForbiddenError, ConflictError } from '../utils/errors.js';
 
 /**
@@ -139,6 +139,28 @@ export async function submitAnswer(teamId, taskId, answer) {
 
   // 9. If correct — update round progress and unlock next task
   if (isCorrect) {
+    const now = new Date();
+    
+    // Update team_task_assignments timing if assignment exists
+    const [assignment] = await db
+      .select({ id: teamTaskAssignments.id, assignedAt: teamTaskAssignments.assignedAt })
+      .from(teamTaskAssignments)
+      .where(and(
+        eq(teamTaskAssignments.teamId, teamId),
+        eq(teamTaskAssignments.taskId, taskId),
+        eq(teamTaskAssignments.roundId, task.roundId)
+      ));
+      
+    if (assignment) {
+      await db
+        .update(teamTaskAssignments)
+        .set({
+          completedAt: now,
+          responseTimeSeconds: Math.floor((now.getTime() - assignment.assignedAt.getTime()) / 1000)
+        })
+        .where(eq(teamTaskAssignments.id, assignment.id));
+    }
+
     // Update team_rounds score
     const [existingRound] = await db
       .select()
@@ -260,12 +282,152 @@ export async function getTaskByToken(teamId, secureToken) {
   const [qr] = await db
     .select({
       taskId: qrCodes.taskId,
+      locationId: qrCodes.locationId,
+      locationMode: locations.taskPoolMode,
+      eventId: locations.eventId,
     })
     .from(qrCodes)
+    .leftJoin(locations, eq(qrCodes.locationId, locations.id))
     .where(eq(qrCodes.secureToken, secureToken));
 
   if (!qr) {
     throw new NotFoundError('Invalid QR code.');
+  }
+
+  let targetTaskId = qr.taskId;
+
+  // If this is a pool-mode location QR
+  if (qr.locationMode === 'pool' && qr.locationId) {
+    // Find active round for this event
+    const [activeRound] = await db
+      .select()
+      .from(rounds)
+      .where(and(eq(rounds.eventId, qr.eventId), eq(rounds.status, 'active')));
+      
+    if (!activeRound) throw new BadRequestError('No active round found for this location.');
+
+    targetTaskId = await db.transaction(async (tx) => {
+      // 1. Re-scan check: Do we already have an incomplete assignment here?
+      const [existingAssignment] = await tx
+        .select({ taskId: teamTaskAssignments.taskId })
+        .from(teamTaskAssignments)
+        .where(and(
+           eq(teamTaskAssignments.teamId, teamId),
+           eq(teamTaskAssignments.locationId, qr.locationId),
+           eq(teamTaskAssignments.roundId, activeRound.id),
+           isNull(teamTaskAssignments.completedAt)
+        ));
+        
+      if (existingAssignment) {
+        return existingAssignment.taskId; // Return existing task immediately!
+      }
+
+      // 2. Lock the location's pool to prevent race conditions during assignment
+      const poolTasks = await tx
+        .select({ 
+          taskId: locationTaskPool.taskId, 
+          maxAttempts: tasks.maxAttempts 
+        })
+        .from(locationTaskPool)
+        .innerJoin(tasks, eq(locationTaskPool.taskId, tasks.id))
+        .where(and(
+           eq(locationTaskPool.locationId, qr.locationId),
+           eq(tasks.isActive, true),
+           eq(tasks.roundId, activeRound.id)
+        ))
+        .for('update'); // Row-level lock!
+
+      if (poolTasks.length === 0) {
+        throw new BadRequestError('No active tasks available at this location for the current round.');
+      }
+
+      const poolTaskIds = poolTasks.map(p => p.taskId);
+
+      // 3. Get team's existing assignments in this round (to avoid repetition)
+      const teamAssigned = await tx
+        .select({ taskId: teamTaskAssignments.taskId })
+        .from(teamTaskAssignments)
+        .where(and(
+           eq(teamTaskAssignments.teamId, teamId),
+           eq(teamTaskAssignments.roundId, activeRound.id)
+        ));
+      
+      const assignedIds = new Set(teamAssigned.map(a => a.taskId));
+
+      // 4. Get team's progress on pool tasks (to check maxAttempts exhaustion)
+      const teamProgress = await tx
+        .select({ taskId: teamTasks.taskId, attempts: teamTasks.attempts })
+        .from(teamTasks)
+        .where(and(
+           eq(teamTasks.teamId, teamId),
+           inArray(teamTasks.taskId, poolTaskIds)
+        ));
+        
+      const attemptsMap = new Map(teamProgress.map(p => [p.taskId, p.attempts]));
+
+      // 5. Filter eligible tasks
+      const eligibleTasks = poolTasks.filter(pt => {
+        // Exclude if already assigned this round
+        if (assignedIds.has(pt.taskId)) return false;
+        // Exclude if max attempts exhausted
+        if (pt.maxAttempts && (attemptsMap.get(pt.taskId) || 0) >= pt.maxAttempts) return false;
+        return true;
+      });
+
+      if (eligibleTasks.length === 0) {
+        throw new BadRequestError('You have completed all tasks at this location! Proceed to the next one.');
+      }
+
+      const eligibleTaskIds = eligibleTasks.map(t => t.taskId);
+
+      // 6. Select the least-assigned task (Load Balancing)
+      const globalAssignments = await tx
+        .select({ taskId: teamTaskAssignments.taskId, count: sql`count(*)` })
+        .from(teamTaskAssignments)
+        .where(inArray(teamTaskAssignments.taskId, eligibleTaskIds))
+        .groupBy(teamTaskAssignments.taskId);
+        
+      const countsMap = new Map(globalAssignments.map(g => [g.taskId, parseInt(g.count)]));
+      
+      let selectedTaskId = eligibleTaskIds[0];
+      let minCount = Infinity;
+      
+      for (const tId of eligibleTaskIds) {
+        const count = countsMap.get(tId) || 0;
+        if (count < minCount) {
+          minCount = count;
+          selectedTaskId = tId;
+        }
+      }
+
+      // 7. Insert the new assignment
+      // Calculate max assignment order
+      const [maxOrder] = await tx
+        .select({ max: sql`MAX(${teamTaskAssignments.assignmentOrder})` })
+        .from(teamTaskAssignments)
+        .where(and(
+           eq(teamTaskAssignments.teamId, teamId),
+           eq(teamTaskAssignments.roundId, activeRound.id)
+        ));
+        
+      const nextOrder = (parseInt(maxOrder?.max) || 0) + 1;
+      
+      await tx.insert(teamTaskAssignments).values({
+        teamId,
+        roundId: activeRound.id,
+        taskId: selectedTaskId,
+        locationId: qr.locationId,
+        assignmentOrder: nextOrder,
+        assignedAt: new Date(),
+        scanOffsetSeconds: Math.floor((Date.now() - activeRound.startedAt.getTime()) / 1000),
+      });
+
+      return selectedTaskId;
+    });
+  }
+
+  if (!targetTaskId) {
+    throw new NotFoundError('This QR code is not configured correctly.');
   }
 
   // Get task with round info
@@ -286,7 +448,7 @@ export async function getTaskByToken(teamId, secureToken) {
     })
     .from(tasks)
     .innerJoin(rounds, eq(tasks.roundId, rounds.id))
-    .where(eq(tasks.id, qr.taskId));
+    .where(eq(tasks.id, targetTaskId));
 
   if (!task) {
     throw new NotFoundError('Task not found.');

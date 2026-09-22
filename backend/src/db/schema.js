@@ -59,9 +59,21 @@ export const locations = pgTable('locations', {
   eventId: integer('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  taskPoolMode: varchar('task_pool_mode', { length: 20 }).notNull().default('single'), // 'single' | 'pool'
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => [
   index('locations_event_id_idx').on(table.eventId),
+]);
+
+// ─── Location Task Pool ───
+export const locationTaskPool = pgTable('location_task_pool', {
+  id: serial('id').primaryKey(),
+  locationId: integer('location_id').notNull().references(() => locations.id, { onDelete: 'cascade' }),
+  taskId: integer('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('location_task_pool_unique_idx').on(table.locationId, table.taskId),
+  index('location_task_pool_location_idx').on(table.locationId),
 ]);
 
 // ─── Tasks ───
@@ -89,13 +101,15 @@ export const tasks = pgTable('tasks', {
 // ─── QR Codes ───
 export const qrCodes = pgTable('qr_codes', {
   id: serial('id').primaryKey(),
-  taskId: integer('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  taskId: integer('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
+  locationId: integer('location_id').references(() => locations.id, { onDelete: 'cascade' }),
   secureToken: varchar('secure_token', { length: 64 }).notNull().unique(),
   qrDataUrl: text('qr_data_url'), // base64 QR image
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('qr_codes_token_idx').on(table.secureToken),
-  uniqueIndex('qr_codes_task_idx').on(table.taskId),
+  index('qr_codes_task_idx').on(table.taskId),
+  index('qr_codes_location_idx').on(table.locationId),
 ]);
 
 // ─── Team Rounds (team progress per round) ───
@@ -155,11 +169,17 @@ export const teamTaskAssignments = pgTable('team_task_assignments', {
   teamId: integer('team_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   roundId: integer('round_id').notNull().references(() => rounds.id, { onDelete: 'cascade' }),
   taskId: integer('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  locationId: integer('location_id').references(() => locations.id, { onDelete: 'set null' }),
   assignmentOrder: integer('assignment_order').notNull(),
+  assignedAt: timestamp('assigned_at').notNull().defaultNow(),
+  completedAt: timestamp('completed_at'),
+  responseTimeSeconds: integer('response_time_seconds'),
+  scanOffsetSeconds: integer('scan_offset_seconds'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('team_task_assignments_unique_idx').on(table.teamId, table.roundId, table.taskId),
   index('team_task_assignments_team_round_idx').on(table.teamId, table.roundId),
+  index('team_task_assignments_location_idx').on(table.locationId),
 ]);
 
 // ─── Round 2 Config (explanation text + WhatsApp link) ───
@@ -210,6 +230,13 @@ export const roundsRelations = relations(rounds, ({ one, many }) => ({
 export const locationsRelations = relations(locations, ({ one, many }) => ({
   event: one(events, { fields: [locations.eventId], references: [events.id] }),
   tasks: many(tasks),
+  locationTaskPools: many(locationTaskPool),
+  qrCodes: many(qrCodes),
+}));
+
+export const locationTaskPoolRelations = relations(locationTaskPool, ({ one }) => ({
+  location: one(locations, { fields: [locationTaskPool.locationId], references: [locations.id] }),
+  task: one(tasks, { fields: [locationTaskPool.taskId], references: [tasks.id] }),
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
@@ -222,6 +249,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 
 export const qrCodesRelations = relations(qrCodes, ({ one }) => ({
   task: one(tasks, { fields: [qrCodes.taskId], references: [tasks.id] }),
+  location: one(locations, { fields: [qrCodes.locationId], references: [locations.id] }),
 }));
 
 export const teamRoundsRelations = relations(teamRounds, ({ one }) => ({

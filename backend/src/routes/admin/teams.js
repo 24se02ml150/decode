@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../../db/index.js';
-import { users, teamRounds, teamTasks, taskAttempts, rounds, tasks } from '../../db/schema.js';
+import { users, teamRounds, teamTasks, taskAttempts, rounds, tasks, teamTaskAssignments } from '../../db/schema.js';
 import { eq, and, sql, desc, ilike, count } from 'drizzle-orm';
 import { validate } from '../../middleware/validate.js';
 import { BadRequestError, NotFoundError } from '../../utils/errors.js';
@@ -146,8 +146,15 @@ router.get('/:id', async (req, res, next) => {
       taskOrder: tasks.taskOrder,
       points: tasks.points,
       roundId: tasks.roundId,
+      scanOffsetSeconds: teamTaskAssignments.scanOffsetSeconds,
+      responseTimeSeconds: teamTaskAssignments.responseTimeSeconds,
     }).from(teamTasks)
       .innerJoin(tasks, eq(teamTasks.taskId, tasks.id))
+      .leftJoin(teamTaskAssignments, and(
+        eq(teamTaskAssignments.teamId, teamTasks.teamId),
+        eq(teamTaskAssignments.taskId, teamTasks.taskId),
+        eq(teamTaskAssignments.roundId, tasks.roundId)
+      ))
       .where(eq(teamTasks.teamId, team.id))
       .orderBy(tasks.roundId, tasks.taskOrder);
 

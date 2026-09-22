@@ -71,6 +71,19 @@ async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS locations_event_id_idx ON locations(event_id);
 
+    -- Alter locations to add task_pool_mode
+    ALTER TABLE locations ADD COLUMN IF NOT EXISTS task_pool_mode VARCHAR(20) NOT NULL DEFAULT 'single';
+
+    -- Location Task Pool table
+    CREATE TABLE IF NOT EXISTS location_task_pool (
+      id SERIAL PRIMARY KEY,
+      location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS location_task_pool_unique_idx ON location_task_pool(location_id, task_id);
+    CREATE INDEX IF NOT EXISTS location_task_pool_location_idx ON location_task_pool(location_id);
+
     -- Tasks table
     CREATE TABLE IF NOT EXISTS tasks (
       id SERIAL PRIMARY KEY,
@@ -95,13 +108,18 @@ async function migrate() {
     -- QR Codes table
     CREATE TABLE IF NOT EXISTS qr_codes (
       id SERIAL PRIMARY KEY,
-      task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+      location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
       secure_token VARCHAR(64) NOT NULL UNIQUE,
       qr_data_url TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE qr_codes ALTER COLUMN task_id DROP NOT NULL;
+    ALTER TABLE qr_codes ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE;
+    
     CREATE UNIQUE INDEX IF NOT EXISTS qr_codes_token_idx ON qr_codes(secure_token);
-    CREATE UNIQUE INDEX IF NOT EXISTS qr_codes_task_idx ON qr_codes(task_id);
+    CREATE INDEX IF NOT EXISTS qr_codes_task_idx ON qr_codes(task_id);
+    CREATE INDEX IF NOT EXISTS qr_codes_location_idx ON qr_codes(location_id);
 
     -- Team Rounds table
     CREATE TABLE IF NOT EXISTS team_rounds (
@@ -172,11 +190,24 @@ async function migrate() {
       team_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
       task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
       assignment_order INTEGER NOT NULL,
+      assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      completed_at TIMESTAMP,
+      response_time_seconds INTEGER,
+      scan_offset_seconds INTEGER,
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
+    
+    ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;
+    ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP NOT NULL DEFAULT NOW();
+    ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
+    ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS response_time_seconds INTEGER;
+    ALTER TABLE team_task_assignments ADD COLUMN IF NOT EXISTS scan_offset_seconds INTEGER;
+    
     CREATE UNIQUE INDEX IF NOT EXISTS team_task_assignments_unique_idx ON team_task_assignments(team_id, round_id, task_id);
     CREATE INDEX IF NOT EXISTS team_task_assignments_team_round_idx ON team_task_assignments(team_id, round_id);
+    CREATE INDEX IF NOT EXISTS team_task_assignments_location_idx ON team_task_assignments(location_id);
 
     -- Round 2 Config table
     CREATE TABLE IF NOT EXISTS round2_config (
