@@ -82,9 +82,20 @@ router.get('/', async (req, res, next) => {
             eq(tasks.roundId, activeRound.id)
           ));
 
+        const completedQuestionsCount = parseInt(completedCount[0]?.count || 0);
+        const allCompleted = totalTasks > 0 && completedQuestionsCount >= totalTasks;
+
+        let config = null;
+        if (allCompleted) {
+          const [cfg] = await db.select().from(round2Config).where(eq(round2Config.roundId, activeRound.id));
+          config = cfg || null;
+        }
+
         round2State = {
           totalQuestions: totalTasks,
-          completedQuestions: parseInt(completedCount[0]?.count || 0),
+          completedQuestions: completedQuestionsCount,
+          allCompleted,
+          config,
         };
       } else {
         // Round 1 (qr_hunt): Get tasks, filtered by assignments if assignCount is set
