@@ -6,9 +6,13 @@ import { eq, and, sql, desc, ilike, count } from 'drizzle-orm';
 import { validate } from '../../middleware/validate.js';
 import { BadRequestError, NotFoundError } from '../../utils/errors.js';
 import { generateTeamId, generatePassword, paginationParams } from '../../utils/helpers.js';
+import bulkImportRoutes from './bulk-import.js';
 import { z } from 'zod';
 
 const router = Router();
+
+// Mount bulk import routes first so they don't get caught by /:id
+router.use('/bulk-import', bulkImportRoutes);
 
 const createTeamSchema = z.object({
   teamName: z.string().min(1, 'Team name is required').max(255),
@@ -37,6 +41,8 @@ router.get('/', async (req, res, next) => {
       id: users.id,
       teamId: users.teamId,
       teamName: users.teamName,
+      leaderName: users.leaderName,
+      mustResetPassword: users.mustResetPassword,
       isActive: users.isActive,
       createdAt: users.createdAt,
     }).from(users).where(eq(users.role, 'team'));
@@ -46,6 +52,8 @@ router.get('/', async (req, res, next) => {
         id: users.id,
         teamId: users.teamId,
         teamName: users.teamName,
+        leaderName: users.leaderName,
+        mustResetPassword: users.mustResetPassword,
         isActive: users.isActive,
         createdAt: users.createdAt,
       }).from(users).where(and(
@@ -64,6 +72,8 @@ router.get('/', async (req, res, next) => {
       id: users.id,
       teamId: users.teamId,
       teamName: users.teamName,
+      leaderName: users.leaderName,
+      mustResetPassword: users.mustResetPassword,
       isActive: users.isActive,
       createdAt: users.createdAt,
     }).from(users).where(
@@ -306,7 +316,38 @@ router.delete('/:id', async (req, res, next) => {
 
     if (!deleted) throw new NotFoundError('Team not found.');
 
-    res.json({ success: true, message: 'Team deleted.' });
+    res.json({ success: true, message: 'Team deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const adminResetPasswordSchema = z.object({
+  newPassword: z.string().min(1, 'New password is required'),
+});
+
+// POST /api/admin/teams/:id/reset-password
+router.post('/:id/reset-password', validate(adminResetPasswordSchema), async (req, res, next) => {
+  try {
+    const { newPassword } = req.validatedBody;
+    const teamId = parseInt(req.params.id);
+
+    const [user] = await db.select().from(users).where(eq(users.id, teamId));
+    if (!user) {
+      throw new NotFoundError('Team not found.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    await db.update(users)
+      .set({ 
+        password: hashedPassword, 
+        mustResetPassword: true,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, teamId));
+
+    res.json({ success: true, message: 'Password reset successfully. Team will be forced to change it on next login.' });
   } catch (err) {
     next(err);
   }

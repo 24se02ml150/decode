@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import api from './api';
 
 const AuthContext = createContext(null);
@@ -40,7 +40,11 @@ export function AuthProvider({ children }) {
     if (res.data.user.role === 'admin') {
       router.push('/admin/dashboard');
     } else {
-      router.push('/team/dashboard');
+      if (res.data.user.mustResetPassword) {
+        router.push('/team/change-password');
+      } else {
+        router.push('/team/dashboard');
+      }
     }
     return res.data;
   };
@@ -67,15 +71,25 @@ export function useAuth() {
 export function useRequireAuth(role) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
+      return;
     }
-    if (!loading && user && role && user.role !== role) {
-      router.push(user.role === 'admin' ? '/admin/dashboard' : '/team/dashboard');
+    
+    if (!loading && user) {
+      if (role && user.role !== role) {
+        router.push(user.role === 'admin' ? '/admin/dashboard' : '/team/dashboard');
+        return;
+      }
+      
+      if (user.role === 'team' && user.mustResetPassword && !pathname.includes('/change-password')) {
+        router.push('/team/change-password');
+      }
     }
-  }, [user, loading, role, router]);
+  }, [user, loading, role, router, pathname]);
 
   return { user, loading };
 }

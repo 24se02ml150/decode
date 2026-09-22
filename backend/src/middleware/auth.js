@@ -16,7 +16,15 @@ export function authMiddleware(req, res, next) {
       role: decoded.role,
       teamId: decoded.teamId,
       teamName: decoded.teamName,
+      mustResetPassword: decoded.mustResetPassword,
     };
+    
+    // Block API access if forced password reset is required, except for necessary auth routes
+    if (req.user.mustResetPassword && 
+        req.user.role === 'team' &&
+        !['/api/auth/change-password', '/api/auth/me', '/api/auth/login'].includes(req.originalUrl.split('?')[0])) {
+      throw new UnauthorizedError('You must change your default password before continuing.');
+    }
     
     next();
   } catch (err) {

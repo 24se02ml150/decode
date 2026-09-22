@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { Plus, Search, Trash2, Key, Filter, CheckCircle2, XCircle, Users } from 'lucide-react';
+import Link from 'next/link';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState([]);
@@ -74,10 +75,16 @@ export default function TeamsPage() {
   };
 
   const handleResetPassword = async (id, teamName) => {
-    if (!confirm(`Are you sure you want to reset the password for ${teamName}?`)) return;
+    const newPassword = prompt(`Enter a new password for ${teamName}. They will be forced to change it on next login:`, '');
+    if (newPassword === null) return;
+    if (!newPassword.trim()) return alert('Password cannot be empty.');
+    
+    if (!confirm(`Are you sure you want to reset the password for ${teamName} to "${newPassword.trim()}"?`)) return;
+    
     try {
-      const res = await api.admin.resetPassword(id);
-      setCreatedTeams([res.data]);
+      const res = await api.admin.resetPassword(id, newPassword.trim());
+      alert(res.message || 'Password reset successfully.');
+      loadTeams();
     } catch (err) {
       alert(err.message);
     }
@@ -124,6 +131,9 @@ export default function TeamsPage() {
           <p className="text-text-secondary mt-1">Manage participating teams and access credentials</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/admin/teams/import" className="btn btn-secondary">
+            Bulk Import Excel
+          </Link>
           <button onClick={() => setShowBulk(true)} className="btn btn-secondary">
             Bulk Generate
           </button>
@@ -208,6 +218,7 @@ export default function TeamsPage() {
               <thead className="bg-bg-hover text-text-secondary border-b border-border">
                 <tr>
                   <th className="px-6 py-4 font-medium">Team Name</th>
+                  <th className="px-6 py-4 font-medium">Leader</th>
                   <th className="px-6 py-4 font-medium">Team ID</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
@@ -218,6 +229,14 @@ export default function TeamsPage() {
                   <tr key={team.id} className="hover:bg-bg-hover/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-text-primary">
                       {team.teamName}
+                      {team.mustResetPassword && (
+                        <span className="ml-2 text-xs bg-error/10 text-error px-2 py-0.5 rounded-full border border-error/20" title="Must change password">
+                          Reset Required
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-text-secondary">
+                      {team.leaderName || '-'}
                     </td>
                     <td className="px-6 py-4 font-mono text-text-secondary">
                       {team.teamId}

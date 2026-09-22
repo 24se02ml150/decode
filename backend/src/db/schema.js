@@ -6,8 +6,10 @@ export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   teamId: varchar('team_id', { length: 50 }).unique(),
   teamName: varchar('team_name', { length: 255 }),
+  leaderName: varchar('leader_name', { length: 255 }),
   email: varchar('email', { length: 255 }),
   password: text('password').notNull(),
+  mustResetPassword: boolean('must_reset_password').notNull().default(false),
   role: varchar('role', { length: 20 }).notNull().default('team'), // 'admin' | 'team'
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),

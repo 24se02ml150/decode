@@ -48,20 +48,29 @@ async function request(endpoint, options = {}) {
 // Auth
 export const api = {
   auth: {
-    login: (body) => request('/api/auth/login', { method: 'POST', body }),
+    login: (credentials) => request('/api/auth/login', { method: 'POST', body: credentials }),
     me: () => request('/api/auth/me'),
+    getMe: () => request('/api/auth/me'),
+    changePassword: (data) => request('/api/auth/change-password', { method: 'POST', body: data }),
   },
 
   // Admin
   admin: {
     // Teams
-    getTeams: (params = '') => request(`/api/admin/teams?${params}`),
+    getTeams: (query = '') => request(`/api/admin/teams?${query}`),
     getTeam: (id) => request(`/api/admin/teams/${id}`),
-    createTeam: (body) => request('/api/admin/teams', { method: 'POST', body }),
-    bulkCreateTeams: (body) => request('/api/admin/teams/bulk', { method: 'POST', body }),
-    updateTeam: (id, body) => request(`/api/admin/teams/${id}`, { method: 'PATCH', body }),
+    createTeam: (data) => request('/api/admin/teams', { method: 'POST', body: data }),
+    bulkCreateTeams: (data) => request('/api/admin/teams/bulk', { method: 'POST', body: data }),
+    updateTeam: (id, data) => request(`/api/admin/teams/${id}`, { method: 'PATCH', body: data }),
     deleteTeam: (id) => request(`/api/admin/teams/${id}`, { method: 'DELETE' }),
-    resetPassword: (id) => request(`/api/admin/teams/${id}/reset-password`, { method: 'POST' }),
+    getTeamReport: (format = 'csv') => request(`/api/admin/teams/export?format=${format}`),
+
+    // Bulk Import
+    previewBulkImport: (formData) => request('/api/admin/teams/bulk-import/preview', { method: 'POST', body: formData }),
+    confirmBulkImport: (data) => request('/api/admin/teams/bulk-import/confirm', { method: 'POST', body: data }),
+
+    // Reset Password
+    resetPassword: (id, newPassword) => request(`/api/admin/teams/${id}/reset-password`, { method: 'POST', body: { newPassword } }),
 
     // Events
     getEvents: () => request('/api/admin/events'),
