@@ -71,7 +71,7 @@ router.get('/live-progress', async (req, res, next) => {
 
     let teamProgress;
     if (roundId) {
-      teamProgress = await db.select({
+      const teamProgressRaw = await db.select({
         teamId: users.id,
         teamIdCode: users.teamId,
         teamName: users.teamName,
@@ -85,6 +85,21 @@ router.get('/live-progress', async (req, res, next) => {
         .innerJoin(users, eq(teamRounds.teamId, users.id))
         .where(eq(teamRounds.roundId, roundId))
         .orderBy(desc(teamRounds.score));
+        
+      // Fetch assignment counts for each team
+      const assignmentCounts = await db.select({
+        teamId: teamTaskAssignments.teamId,
+        count: sql`count(*)`
+      }).from(teamTaskAssignments)
+        .where(eq(teamTaskAssignments.roundId, roundId))
+        .groupBy(teamTaskAssignments.teamId);
+
+      const countMap = new Map(assignmentCounts.map(a => [a.teamId, parseInt(a.count)]));
+
+      teamProgress = teamProgressRaw.map(t => ({
+        ...t,
+        totalTasks: countMap.get(t.teamId) || 0
+      }));
     } else {
       // Get all teams with latest round progress
       teamProgress = await db.select({
@@ -119,7 +134,7 @@ router.get('/round/:roundId', async (req, res, next) => {
     const [round] = await db.select().from(rounds).where(eq(rounds.id, roundId));
     if (!round) return res.status(404).json({ success: false, error: { message: 'Round not found.' } });
 
-    const results = await db.select({
+    const resultsRaw = await db.select({
       teamId: users.id,
       teamIdCode: users.teamId,
       teamName: users.teamName,
@@ -132,6 +147,21 @@ router.get('/round/:roundId', async (req, res, next) => {
       .innerJoin(users, eq(teamRounds.teamId, users.id))
       .where(eq(teamRounds.roundId, roundId))
       .orderBy(desc(teamRounds.score));
+
+    // Fetch assignment counts for each team
+    const assignmentCounts = await db.select({
+      teamId: teamTaskAssignments.teamId,
+      count: sql`count(*)`
+    }).from(teamTaskAssignments)
+      .where(eq(teamTaskAssignments.roundId, roundId))
+      .groupBy(teamTaskAssignments.teamId);
+
+    const countMap = new Map(assignmentCounts.map(a => [a.teamId, parseInt(a.count)]));
+
+    const results = resultsRaw.map(t => ({
+      ...t,
+      totalTasks: countMap.get(t.teamId) || 0
+    }));
 
     const [totalTasks] = await db.select({ count: sql`count(*)` }).from(tasks).where(eq(tasks.roundId, roundId));
 

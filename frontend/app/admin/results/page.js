@@ -25,7 +25,7 @@ export default function ResultsPage() {
     }, 15000);
     
     return () => clearInterval(interval);
-  }, [activeTab]);
+  }, [activeTab, selectedRound]);
 
   useEffect(() => {
     if (activeTab === 'round' && selectedRound) {
@@ -59,7 +59,7 @@ export default function ResultsPage() {
   const refreshLiveData = async () => {
     setRefreshing(true);
     try {
-      const res = await api.admin.getLiveProgress();
+      const res = await api.admin.getLiveProgress(selectedRound);
       setLiveData(res.data);
     } catch (err) {
       console.error(err);
@@ -244,16 +244,16 @@ export default function ResultsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {roundResults?.results?.map((team, idx) => (
-                      <tr key={team.teamId} className="hover:bg-bg-hover/50">
+                    {roundResults?.results?.map((t, idx) => (
+                      <tr key={t.teamId} className="hover:bg-bg-hover/50">
                         <td className="px-6 py-3">{idx + 1}</td>
-                        <td className="px-6 py-3 font-medium">{team.teamName}</td>
-                        <td className="px-6 py-3 font-bold text-accent">{team.score}</td>
-                        <td className="px-6 py-3">{team.tasksCompleted} / {roundResults.totalTasks}</td>
+                        <td className="px-6 py-3 font-medium">{t.teamName}</td>
+                        <td className="px-6 py-3 font-bold text-accent">{t.score}</td>
+                        <td className="px-6 py-3">{t.tasksCompleted} / {t.totalTasks || liveData.totalTasks || 1}</td>
                         <td className="px-6 py-3">
-                          {team.isQualified === true ? (
+                          {t.isQualified === true ? (
                             <span className="badge badge-success">Yes</span>
-                          ) : team.isQualified === false ? (
+                          ) : t.isQualified === false ? (
                             <span className="badge badge-error">No</span>
                           ) : (
                             <span className="badge badge-neutral">Pending</span>
