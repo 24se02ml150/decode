@@ -69,7 +69,8 @@ export function useAuth() {
 }
 
 export function useRequireAuth(role) {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
+  const { user, loading } = auth;
   const router = useRouter();
   const pathname = usePathname();
 
@@ -91,5 +92,5 @@ export function useRequireAuth(role) {
     }
   }, [user, loading, role, router, pathname]);
 
-  return { user, loading };
+  return auth;
 }
