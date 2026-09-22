@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
 export default function TaskPage({ params }) {
-  const { token } = use(params);
   const router = useRouter();
+  const [token, setToken] = useState(null);
   const [task, setTask] = useState(null);
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState(null);
@@ -15,12 +15,18 @@ export default function TaskPage({ params }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadTask();
+    Promise.resolve(params).then(p => setToken(p.token));
+  }, [params]);
+
+  useEffect(() => {
+    if (token) {
+      loadTask(token);
+    }
   }, [token]);
 
-  const loadTask = async () => {
+  const loadTask = async (taskToken) => {
     try {
-      const res = await api.team.getTask(token);
+      const res = await api.team.getTask(taskToken);
       setTask(res.data);
     } catch (err) {
       setError(err.message || 'Failed to load task.');

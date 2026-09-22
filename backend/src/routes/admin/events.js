@@ -201,4 +201,18 @@ router.get('/:id/validate', async (req, res, next) => {
   }
 });
 
+// DELETE /api/admin/events/:id
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const [deleted] = await db.delete(events)
+      .where(eq(events.id, parseInt(req.params.id)))
+      .returning({ id: events.id });
+
+    if (!deleted) throw new NotFoundError('Event not found.');
+    res.json({ success: true, message: 'Event deleted.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

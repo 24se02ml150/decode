@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
-import { Plus, Settings, Play, Pause, Square, AlertCircle, ChevronRight, Check } from 'lucide-react';
+import { Plus, Settings, Play, Pause, Square, AlertCircle, ChevronRight, Check, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -80,6 +80,16 @@ export default function EventsPage() {
       if (action === 'pause') await api.admin.pauseEvent(id);
       if (action === 'resume') await api.admin.resumeEvent(id);
       if (action === 'end') await api.admin.endEvent(id);
+      loadEvents();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteEvent = async (id) => {
+    if (!confirm('Are you sure you want to delete this event? This will delete all rounds, tasks, locations, and teams associated with it. This action cannot be undone.')) return;
+    try {
+      await api.admin.deleteEvent(id);
       loadEvents();
     } catch (err) {
       alert(err.message);
@@ -171,13 +181,22 @@ export default function EventsPage() {
 
               {/* Card Actions */}
               <div className="p-4 bg-bg-hover/50 border-t border-border flex items-center justify-between gap-3">
-                <Link 
-                  href={`/admin/events/${event.id}`}
-                  className="btn btn-secondary btn-sm gap-2"
-                >
-                  <Settings size={16} />
-                  Configure
-                </Link>
+                <div className="flex gap-2">
+                  <Link 
+                    href={`/admin/events/${event.id}`}
+                    className="btn btn-secondary btn-sm gap-2"
+                  >
+                    <Settings size={16} />
+                    Configure
+                  </Link>
+                  <button 
+                    onClick={() => handleDeleteEvent(event.id)}
+                    className="btn btn-secondary btn-sm p-2 text-error hover:text-error hover:border-error"
+                    title="Delete Event"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
 
                 <div className="flex gap-2">
                   {event.status === 'draft' && (

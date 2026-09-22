@@ -72,6 +72,7 @@ export const api = {
     pauseEvent: (id) => request(`/api/admin/events/${id}/pause`, { method: 'POST' }),
     resumeEvent: (id) => request(`/api/admin/events/${id}/resume`, { method: 'POST' }),
     endEvent: (id) => request(`/api/admin/events/${id}/end`, { method: 'POST' }),
+    deleteEvent: (id) => request(`/api/admin/events/${id}`, { method: 'DELETE' }),
     validateEvent: (id) => request(`/api/admin/events/${id}/validate`),
 
     // Rounds

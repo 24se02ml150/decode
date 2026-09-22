@@ -7,8 +7,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function RoundConfigPage({ params }) {
-  const { id } = use(params);
   const router = useRouter();
+  const [id, setId] = useState(null);
+
+  useEffect(() => {
+    Promise.resolve(params).then(p => setId(p.id));
+  }, [params]);
   const [round, setRound] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -40,10 +44,13 @@ export default function RoundConfigPage({ params }) {
   });
 
   useEffect(() => {
-    loadData();
+    if (id) {
+      loadData();
+    }
   }, [id]);
 
   const loadData = async () => {
+    if (!id) return;
     try {
       const res = await api.admin.getRound(id);
       setRound(res.data.round);
@@ -150,6 +157,16 @@ export default function RoundConfigPage({ params }) {
     }
   };
 
+  const handleDeleteRound = async () => {
+    if (!confirm('Are you sure you want to delete this round? All tasks inside will also be deleted.')) return;
+    try {
+      await api.admin.deleteRound(id);
+      router.push(`/admin/events/${round.eventId}`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const handleSaveRoundSettings = async () => {
     setSavingSettings(true);
     try {
@@ -195,9 +212,18 @@ export default function RoundConfigPage({ params }) {
             <h1 className="text-2xl font-bold text-text-primary">{round?.name} {isQuestions ? 'Questions' : 'Tasks'}</h1>
             <p className="text-text-secondary mt-1">Configure {isQuestions ? 'questions' : 'tasks'} for this round</p>
           </div>
-          <button onClick={openNewTask} className="btn btn-primary gap-2">
-            <Plus size={18} /> Add {isQuestions ? 'Question' : 'Task'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleDeleteRound} 
+              className="btn btn-secondary text-error hover:border-error hover:bg-error-light/10"
+              title="Delete Round"
+            >
+              <Trash2 size={18} className="mr-2" /> Delete Round
+            </button>
+            <button onClick={openNewTask} className="btn btn-primary gap-2">
+              <Plus size={18} /> Add {isQuestions ? 'Question' : 'Task'}
+            </button>
+          </div>
         </div>
       </div>
 

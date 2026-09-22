@@ -7,11 +7,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function EventConfigPage({ params }) {
-  const { id } = use(params);
   const router = useRouter();
+  const [id, setId] = useState(null);
   const [event, setEvent] = useState(null);
   const [rounds, setRounds] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.resolve(params).then(p => setId(p.id));
+  }, [params]);
+
+  useEffect(() => {
+    if (id) {
+      loadData();
+    }
+  }, [id]);
   
   // Modals
   const [showRoundModal, setShowRoundModal] = useState(false);
@@ -23,11 +33,8 @@ export default function EventConfigPage({ params }) {
     qualifyCount: '',
   });
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
-
   const loadData = async () => {
+    if (!id) return;
     try {
       const res = await api.admin.getEvent(id);
       setEvent(res.data.event);
