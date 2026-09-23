@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/lib/auth';
+import ErrorBoundary from './ErrorBoundary';
 
 const navItems = [
   {
@@ -59,7 +60,9 @@ export default function TeamLayout({ children }) {
   return (
     <div className="min-h-dvh bg-bg">
       <main className={hideNav ? '' : 'mobile-safe-bottom'}>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </main>
 
       {!hideNav && (

@@ -154,11 +154,11 @@ export default function TeamDashboard() {
                   </div>
                   <h3 className="font-bold text-text-primary mb-1">Round Completed</h3>
                   <p className="text-text-secondary text-sm mb-4">
-                    {round2State.config?.explanationText || 'You have answered all questions in this round.'}
+                    {questionsState.config?.explanationText || 'You have answered all questions in this round.'}
                   </p>
-                  {round2State.config?.whatsappLink && (
+                  {questionsState.config?.whatsappLink && (
                     <a
-                      href={round2State.config.whatsappLink}
+                      href={questionsState.config.whatsappLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-primary btn-full gap-3"
@@ -178,13 +178,13 @@ export default function TeamDashboard() {
                     <p className="text-text-muted text-xs">Questions</p>
                   </div>
                   <div className="progress-bar">
-                    <div className="progress-bar-fill" style={{ width: `${round2State.totalQuestions > 0 ? (round2State.completedQuestions / round2State.totalQuestions) * 100 : 0}%` }}></div>
+                    <div className="progress-bar-fill" style={{ width: `${questionsState.totalQuestions > 0 ? (questionsState.completedQuestions / questionsState.totalQuestions) * 100 : 0}%` }}></div>
                   </div>
                 </div>
               )
             )}
 
-            {!round2State?.allCompleted && (
+            {!questionsState?.allCompleted && (
               <button
                 onClick={() => router.push('/team/round2')}
                 className="btn btn-primary btn-full btn-lg gap-3 mt-2"
@@ -192,15 +192,20 @@ export default function TeamDashboard() {
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
                 </svg>
-                {round2State?.completedQuestions > 0 ? 'Continue Round 2' : 'Start Round 2'}
+                {questionsState?.completedQuestions > 0 ? 'Continue Round 2' : 'Start Round 2'}
               </button>
             )}
           </div>
         </div>
       )}
 
+<<<<<<< HEAD
       {/* Task List or Starting Clue */}
       {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
+=======
+      {/* Task List — Round 1 only */}
+      {currentRound && currentRound.status === 'active' && !isQuestionsRound && (
+>>>>>>> 1331507901c4e0587c200e61772382e160580ef7
         <div className="mx-5 mb-4">
           {activeStartingClue ? (
             <div className="card p-6 text-center animate-fade-in border-2 border-accent/30 bg-accent-light/10">
@@ -268,7 +273,11 @@ export default function TeamDashboard() {
         </div>
       )}
 
+<<<<<<< HEAD
       {/* Scan QR CTA */}
+=======
+      {/* Scan QR CTA — Round 1 only */}
+>>>>>>> 1331507901c4e0587c200e61772382e160580ef7
       {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
         <div className="mx-5 mt-6 mb-4">
           <button
