@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { users, events, rounds, tasks, teamRounds, teamTasks, qrCodes, teamTaskAssignments, round2Config } from '../../db/schema.js';
+import { users, events, rounds, tasks, teamRounds, teamTasks, qrCodes, teamTaskAssignments, round2Config, locations } from '../../db/schema.js';
 import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
 
 const router = Router();
