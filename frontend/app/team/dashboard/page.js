@@ -43,6 +43,7 @@ export default function TeamDashboard() {
   const isQuestionsRound = currentRound?.roundType === 'questions';
   const qualifiedRound = data?.rounds?.find(r => r.isQualified === true && r.status === 'completed');
   const eliminatedRound = data?.rounds?.find(r => r.isQualified === false && r.status === 'completed');
+  const activeStartingClue = tasks.find(t => t.startingClue)?.startingClue;
 
   const total = currentRound?.totalTasks > 0 ? currentRound.totalTasks : 1;
   const progress = currentRound ? (currentRound.teamTasksCompleted / total) * 100 : 0;
@@ -198,67 +199,77 @@ export default function TeamDashboard() {
         </div>
       )}
 
-      {/* Task List — Round 1 only */}
-      {currentRound && currentRound.status === 'active' && !isRound2 && (
+      {/* Task List or Starting Clue */}
+      {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
         <div className="mx-5 mb-4">
-          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Tasks</h3>
-          <div className="space-y-2 stagger-children">
-            {tasks.map((task) => (
-              <div
-                key={task.id}
-                className={`card p-4 flex items-center gap-3 ${task.isCompleted ? 'opacity-70' : task.isUnlocked ? 'card-interactive cursor-pointer' : 'opacity-40'}`}
-                onClick={() => {
-                  if (task.isUnlocked && !task.isCompleted) {
-                    router.push(`/team/scan`);
-                  }
-                }}
-              >
-                {/* Status Icon */}
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  task.isCompleted ? 'bg-success-light text-success' : task.isUnlocked ? 'bg-accent-light text-accent' : 'bg-bg-hover text-text-muted'
-                }`}>
-                  {task.isCompleted ? (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  ) : task.isUnlocked ? (
-                    <span className="text-sm font-bold">{task.taskOrder}</span>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                    </svg>
-                  )}
-                </div>
-
-                {/* Task Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-text-primary text-sm">{task.title}</p>
-                  <p className="text-text-muted text-xs">
-                    {task.isCompleted ? 'Completed' : task.isUnlocked ? 'Scan QR to start' : 'Locked'}
-                    {task.points > 0 && ` · ${task.points} pts`}
-                  </p>
-                  {task.startingClue && (
-                    <div className="mt-2 p-2 bg-accent-light/30 rounded border border-accent/20">
-                      <p className="text-xs font-semibold text-accent mb-0.5">Starting Clue</p>
-                      <p className="text-xs text-text-secondary">{task.startingClue}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Arrow */}
-                {task.isUnlocked && !task.isCompleted && (
-                  <svg className="w-4 h-4 text-text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                )}
+          {activeStartingClue ? (
+            <div className="card p-6 text-center animate-fade-in border-2 border-accent/30 bg-accent-light/10">
+              <div className="w-16 h-16 rounded-full bg-accent-light flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
               </div>
-            ))}
-          </div>
+              <h3 className="text-lg font-bold text-text-primary mb-2">Next Destination</h3>
+              <p className="text-text-secondary mb-4">{activeStartingClue}</p>
+              <p className="text-text-muted text-xs">Scan the QR code at the destination to unlock your first task.</p>
+            </div>
+          ) : (
+            <>
+              <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Tasks</h3>
+              <div className="space-y-2 stagger-children">
+                {tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={`card p-4 flex items-center gap-3 ${task.isCompleted ? 'opacity-70' : task.isUnlocked ? 'card-interactive cursor-pointer' : 'opacity-40'}`}
+                    onClick={() => {
+                      if (task.isUnlocked && !task.isCompleted) {
+                        router.push(`/team/scan`);
+                      }
+                    }}
+                  >
+                    {/* Status Icon */}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      task.isCompleted ? 'bg-success-light text-success' : task.isUnlocked ? 'bg-accent-light text-accent' : 'bg-bg-hover text-text-muted'
+                    }`}>
+                      {task.isCompleted ? (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      ) : task.isUnlocked ? (
+                        <span className="text-sm font-bold">{task.taskOrder}</span>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                      )}
+                    </div>
+
+                    {/* Task Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-text-primary text-sm">{task.title}</p>
+                      <p className="text-text-muted text-xs">
+                        {task.isCompleted ? 'Completed' : task.isUnlocked ? 'Scan QR to start' : 'Locked'}
+                        {task.points > 0 && ` · ${task.points} pts`}
+                      </p>
+                    </div>
+
+                    {/* Arrow */}
+                    {task.isUnlocked && !task.isCompleted && (
+                      <svg className="w-4 h-4 text-text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* Scan QR CTA — Round 1 only */}
-      {currentRound && currentRound.status === 'active' && !isRound2 && !eliminatedRound && (
+      {/* Scan QR CTA */}
+      {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
         <div className="mx-5 mt-6 mb-4">
           <button
             onClick={() => router.push('/team/scan')}

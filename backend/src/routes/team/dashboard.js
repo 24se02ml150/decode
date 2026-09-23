@@ -176,7 +176,7 @@ router.get('/', async (req, res, next) => {
             isCompleted: teamTask?.isCompleted || false,
             isUnlocked,
             attempts: teamTask?.attempts || 0,
-            startingClue: isFirstTask && !teamTask?.isCompleted ? task.startingClue : null,
+            startingClue: isFirstTask && !teamTask?.isUnlocked ? task.startingClue : null,
           };
         }));
       }

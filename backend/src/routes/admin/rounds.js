@@ -4,7 +4,7 @@ import { rounds, tasks, teamRounds, users, teamTaskAssignments, events, location
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { validate } from '../../middleware/validate.js';
 import { NotFoundError, BadRequestError } from '../../utils/errors.js';
-import { calculateQualification } from '../../services/qualification.js';
+import { calculateQualification, isTeamQualified } from '../../services/qualification.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -133,7 +133,7 @@ router.post('/:id/start', async (req, res, next) => {
       .where(eq(events.id, updated.eventId));
 
     // Pre-assign the first task (taskOrder = 1) for all active teams
-    await preassignStartingTasks(roundId, updated.startedAt, updated.totalPausedSeconds);
+    await preassignStartingTasks(updated);
 
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -142,7 +142,9 @@ router.post('/:id/start', async (req, res, next) => {
 });
 
 // Helper: Pre-assign the starting task (taskOrder = 1) for all teams
-async function preassignStartingTasks(roundId, roundStartedAt, roundPausedSnapshot) {
+async function preassignStartingTasks(round) {
+  const { id: roundId, startedAt: roundStartedAt, totalPausedSeconds: roundPausedSnapshot, roundNumber, eventId } = round;
+
   // Get all active teams
   const teamList = await db.select({ id: users.id })
     .from(users)
@@ -192,6 +194,11 @@ async function preassignStartingTasks(roundId, roundStartedAt, roundPausedSnapsh
 
   // Pre-assign for each team
   for (const team of teamList) {
+    // Check if team is qualified for this round
+    if (!(await isTeamQualified(team.id, roundNumber, eventId))) {
+      continue; // Skip if not qualified
+    }
+
     // Check if team already has an assignment for taskOrder = 1
     const existing = await db.select({ id: teamTaskAssignments.id })
       .from(teamTaskAssignments)
