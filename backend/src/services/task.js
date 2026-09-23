@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { tasks, teamTasks, teamRounds, taskAttempts, rounds, qrCodes, teamTaskAssignments, round2Config, locations, locationTaskPool } from '../db/schema.js';
+import { tasks, teamTasks, teamRounds, taskAttempts, rounds, qrCodes, teamTaskAssignments, round2Config, locations, locationTaskPool, users } from '../db/schema.js';
 import { eq, and, sql, asc, inArray, notInArray, isNull } from 'drizzle-orm';
 import { BadRequestError, NotFoundError, ForbiddenError, ConflictError } from '../utils/errors.js';
 
@@ -342,19 +342,25 @@ export async function getTaskByToken(teamId, secureToken) {
     if (!activeRound) throw new BadRequestError('No active round found for this location.');
 
     targetTaskId = await db.transaction(async (tx) => {
-      // 1. Re-scan check: Do we already have an incomplete assignment here?
+      // 0. Lock the team record to prevent concurrent scans by multiple team members
+      await tx.select({ id: users.id }).from(users).where(eq(users.id, teamId)).for('update');
+
+      // 1. Re-scan check: Do we already have ANY incomplete assignment for this round?
       const [existingAssignment] = await tx
-        .select({ taskId: teamTaskAssignments.taskId })
+        .select({ taskId: teamTaskAssignments.taskId, locationId: teamTaskAssignments.locationId })
         .from(teamTaskAssignments)
         .where(and(
            eq(teamTaskAssignments.teamId, teamId),
-           eq(teamTaskAssignments.locationId, qr.locationId),
            eq(teamTaskAssignments.roundId, activeRound.id),
            isNull(teamTaskAssignments.completedAt)
         ));
         
       if (existingAssignment) {
-        return existingAssignment.taskId; // Return existing task immediately!
+        if (existingAssignment.locationId === qr.locationId) {
+          return existingAssignment.taskId; // Return existing task immediately (re-scan)
+        } else {
+          throw new ForbiddenError('You have an unfinished task at another location. Complete it before scanning a new location.');
+        }
       }
 
       // 2. Lock the location's pool to prevent race conditions during assignment
