@@ -86,6 +86,20 @@ export default function BulkImportPage() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadTemplate = async () => {
+    try {
+      const blob = await api.admin.getTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'team_import_template.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Failed to download template. Please try again.');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
       <div>
@@ -136,9 +150,9 @@ export default function BulkImportPage() {
         <div className="card p-6">
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-lg font-bold">Upload File</h2>
-            <a href={`${API_URL}/api/admin/teams/bulk-import/template`} className="btn btn-secondary btn-sm flex items-center gap-2">
+            <button onClick={downloadTemplate} className="btn btn-secondary btn-sm flex items-center gap-2">
               <Download size={14} /> Download Template
-            </a>
+            </button>
           </div>
           <div className="mb-6 bg-bg-hover p-4 rounded-lg text-sm text-text-secondary">
             <p className="font-bold text-text-primary mb-2">Required Excel format (.xlsx):</p>

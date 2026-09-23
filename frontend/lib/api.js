@@ -28,8 +28,9 @@ async function request(endpoint, options = {}) {
 
   const res = await fetch(`${API_URL}${endpoint}`, config);
 
-  // Handle CSV downloads
-  if (res.headers.get('content-type')?.includes('text/csv')) {
+  // Handle file downloads (CSV, Excel)
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('text/csv') || contentType.includes('spreadsheetml')) {
     const blob = await res.blob();
     return blob;
   }
@@ -70,6 +71,7 @@ export const api = {
     getTeamReport: (format = 'csv') => request(`/api/admin/teams/export?format=${format}`),
 
     // Bulk Import
+    getTemplate: () => request('/api/admin/teams/bulk-import/template'),
     previewBulkImport: (formData) => request('/api/admin/teams/bulk-import/preview', { method: 'POST', body: formData }),
     confirmBulkImport: (data) => request('/api/admin/teams/bulk-import/confirm', { method: 'POST', body: data }),
 
