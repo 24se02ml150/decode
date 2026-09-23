@@ -101,6 +101,19 @@ router.get('/', async (req, res, next) => {
         // Round 1 (qr_hunt): Get tasks, filtered by assignments if assignCount is set
         let taskList;
 
+        // Get the team's first assigned task for this round (random pre-assignment)
+        const firstAssignment = await db.select({
+          taskId: teamTaskAssignments.taskId,
+        }).from(teamTaskAssignments)
+          .where(and(
+            eq(teamTaskAssignments.teamId, teamId),
+            eq(teamTaskAssignments.roundId, activeRound.id),
+            eq(teamTaskAssignments.assignmentOrder, 1)
+          ))
+          .limit(1);
+
+        const firstAssignedTaskId = firstAssignment[0]?.taskId || null;
+
         if (activeRound.assignCount) {
           // Get assigned task IDs for this team
           const assignments = await db.select({
@@ -146,7 +159,7 @@ router.get('/', async (req, res, next) => {
             .orderBy(tasks.taskOrder);
         }
 
-        // Fetch startingClue for the first task's location (if it has one)
+        // Fetch startingClue for each task's location (if it has one)
         for (const task of taskList) {
           task.startingClue = null;
           if (task.locationId) {
@@ -157,6 +170,16 @@ router.get('/', async (req, res, next) => {
           }
         }
 
+        // Look up the QR token for the first assigned task (so frontend can navigate directly)
+        let firstTaskToken = null;
+        if (firstAssignedTaskId) {
+          const [qr] = await db.select({ secureToken: qrCodes.secureToken })
+            .from(qrCodes)
+            .where(eq(qrCodes.taskId, firstAssignedTaskId))
+            .limit(1);
+          firstTaskToken = qr?.secureToken || null;
+        }
+
         totalTasks = activeRound.assignCount || taskList.length;
 
         // Get team's task status for each
@@ -164,8 +187,8 @@ router.get('/', async (req, res, next) => {
           const [teamTask] = await db.select().from(teamTasks)
             .where(and(eq(teamTasks.teamId, teamId), eq(teamTasks.taskId, task.id)));
 
-          // First task in the assigned set is always unlocked
-          const isFirstTask = task.taskOrder === Math.min(...taskList.map(t => t.taskOrder));
+          // The first assigned task is always unlocked
+          const isFirstTask = firstAssignedTaskId ? task.id === firstAssignedTaskId : task.taskOrder === Math.min(...taskList.map(t => t.taskOrder));
           const isUnlocked = isFirstTask || teamTask?.isUnlocked || false;
 
           return {
@@ -177,6 +200,8 @@ router.get('/', async (req, res, next) => {
             isUnlocked,
             attempts: teamTask?.attempts || 0,
             startingClue: isFirstTask && !teamTask?.isUnlocked ? task.startingClue : null,
+            isFirstAssigned: isFirstTask,
+            firstTaskToken: isFirstTask ? firstTaskToken : null,
           };
         }));
       }

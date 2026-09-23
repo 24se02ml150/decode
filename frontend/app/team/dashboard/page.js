@@ -44,6 +44,7 @@ export default function TeamDashboard() {
   const qualifiedRound = data?.rounds?.find(r => r.isQualified === true && r.status === 'completed');
   const eliminatedRound = data?.rounds?.find(r => r.isQualified === false && r.status === 'completed');
   const activeStartingClue = tasks.find(t => t.startingClue)?.startingClue;
+  const firstAssignedToken = tasks.find(t => t.firstTaskToken)?.firstTaskToken || null;
 
   const total = currentRound?.totalTasks > 0 ? currentRound.totalTasks : 1;
   const progress = currentRound ? (currentRound.teamTasksCompleted / total) * 100 : 0;
@@ -199,15 +200,10 @@ export default function TeamDashboard() {
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* Task List or Starting Clue */}
-      {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
-=======
       {/* Task List — Round 1 only */}
-      {currentRound && currentRound.status === 'active' && !isQuestionsRound && (
->>>>>>> 1331507901c4e0587c200e61772382e160580ef7
+      {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
         <div className="mx-5 mb-4">
-          {activeStartingClue ? (
+          {activeStartingClue && firstAssignedToken ? (
             <div className="card p-6 text-center animate-fade-in border-2 border-accent/30 bg-accent-light/10">
               <div className="w-16 h-16 rounded-full bg-accent-light flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -215,9 +211,36 @@ export default function TeamDashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-text-primary mb-2">Next Destination</h3>
+              <h3 className="text-lg font-bold text-text-primary mb-2">Your First Destination</h3>
               <p className="text-text-secondary mb-4">{activeStartingClue}</p>
-              <p className="text-text-muted text-xs">Scan the QR code at the destination to unlock your first task.</p>
+              <button
+                onClick={() => window.location.href = `/team/task/${firstAssignedToken}`}
+                className="btn btn-primary btn-full btn-lg gap-3"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+                Go to First Task
+              </button>
+            </div>
+          ) : firstAssignedToken && !activeStartingClue ? (
+            <div className="card p-6 text-center animate-fade-in border-2 border-accent/30 bg-accent-light/10">
+              <div className="w-16 h-16 rounded-full bg-accent-light flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-text-primary mb-2">Your Task is Ready!</h3>
+              <p className="text-text-secondary mb-4">Your first task has been assigned. Tap below to start.</p>
+              <button
+                onClick={() => window.location.href = `/team/task/${firstAssignedToken}`}
+                className="btn btn-primary btn-full btn-lg gap-3"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+                Go to First Task
+              </button>
             </div>
           ) : (
             <>
@@ -229,7 +252,11 @@ export default function TeamDashboard() {
                     className={`card p-4 flex items-center gap-3 ${task.isCompleted ? 'opacity-70' : task.isUnlocked ? 'card-interactive cursor-pointer' : 'opacity-40'}`}
                     onClick={() => {
                       if (task.isUnlocked && !task.isCompleted) {
-                        router.push(`/team/scan`);
+                        if (task.firstTaskToken) {
+                          window.location.href = `/team/task/${task.firstTaskToken}`;
+                        } else {
+                          router.push(`/team/scan`);
+                        }
                       }
                     }}
                   >
@@ -254,7 +281,7 @@ export default function TeamDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-text-primary text-sm">{task.title}</p>
                       <p className="text-text-muted text-xs">
-                        {task.isCompleted ? 'Completed' : task.isUnlocked ? 'Scan QR to start' : 'Locked'}
+                        {task.isCompleted ? 'Completed' : task.isUnlocked ? (task.firstTaskToken ? 'Tap to start' : 'Scan QR to start') : 'Locked'}
                         {task.points > 0 && ` · ${task.points} pts`}
                       </p>
                     </div>
@@ -273,11 +300,7 @@ export default function TeamDashboard() {
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* Scan QR CTA */}
-=======
       {/* Scan QR CTA — Round 1 only */}
->>>>>>> 1331507901c4e0587c200e61772382e160580ef7
       {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
         <div className="mx-5 mt-6 mb-4">
           <button

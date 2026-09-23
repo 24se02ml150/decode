@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { rounds, tasks, teamRounds, users, teamTaskAssignments, events, locations, locationTaskPool } from '../../db/schema.js';
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { rounds, tasks, teamRounds, users, teamTaskAssignments, events } from '../../db/schema.js';
+import { eq, and, sql } from 'drizzle-orm';
 import { validate } from '../../middleware/validate.js';
 import { NotFoundError, BadRequestError } from '../../utils/errors.js';
 import { calculateQualification, isTeamQualified } from '../../services/qualification.js';
@@ -141,7 +141,7 @@ router.post('/:id/start', async (req, res, next) => {
   }
 });
 
-// Helper: Pre-assign the starting task (taskOrder = 1) for all teams
+// Helper: Pre-assign a RANDOM starting task for each team (load-balanced)
 async function preassignStartingTasks(round) {
   const { id: roundId, startedAt: roundStartedAt, totalPausedSeconds: roundPausedSnapshot, roundNumber, eventId } = round;
 
@@ -152,58 +152,41 @@ async function preassignStartingTasks(round) {
 
   if (teamList.length === 0) return;
 
-  // Get tasks with taskOrder = 1
-  const startingTasks = await db.select({
+  // Get ALL active tasks for this round (not just taskOrder=1)
+  const allRoundTasks = await db.select({
     id: tasks.id,
     locationId: tasks.locationId,
   })
     .from(tasks)
-    .where(and(eq(tasks.roundId, roundId), eq(tasks.taskOrder, 1), eq(tasks.isActive, true)));
+    .where(and(eq(tasks.roundId, roundId), eq(tasks.isActive, true)));
 
-  if (startingTasks.length === 0) return;
+  if (allRoundTasks.length === 0) return;
 
-  // Find out if they belong to a pool location
-  // We need to group tasks by location and check taskPoolMode
-  const locationIds = startingTasks.map(t => t.locationId).filter(id => id != null);
-  let locationModes = new Map();
-  
-  if (locationIds.length > 0) {
-    const locs = await db.select({ id: locations.id, taskPoolMode: locations.taskPoolMode })
-      .from(locations)
-      .where(inArray(locations.id, locationIds));
-    for (const l of locs) {
-      locationModes.set(l.id, l.taskPoolMode);
-    }
+  // Shuffle teams randomly (Fisher-Yates)
+  const shuffledTeams = [...teamList];
+  for (let i = shuffledTeams.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledTeams[i], shuffledTeams[j]] = [shuffledTeams[j], shuffledTeams[i]];
   }
 
-  // Find all location pools for taskOrder = 1 tasks
-  const poolLocations = Array.from(locationModes.entries())
-    .filter(([_, mode]) => mode === 'pool')
-    .map(([id]) => id);
-
-  let poolTasksMap = new Map(); // locationId -> array of taskIds
-  if (poolLocations.length > 0) {
-    const poolMappings = await db.select({ locationId: locationTaskPool.locationId, taskId: locationTaskPool.taskId })
-      .from(locationTaskPool)
-      .where(inArray(locationTaskPool.locationId, poolLocations));
-    for (const p of poolMappings) {
-      if (!poolTasksMap.has(p.locationId)) poolTasksMap.set(p.locationId, []);
-      poolTasksMap.get(p.locationId).push(p.taskId);
-    }
+  // Track assignment counts locally for load balancing within this batch
+  const localCounts = new Map(); // taskId -> count
+  for (const t of allRoundTasks) {
+    localCounts.set(t.id, 0);
   }
 
   // Pre-assign for each team
-  for (const team of teamList) {
+  for (const team of shuffledTeams) {
     // Check if team is qualified for this round
     if (!(await isTeamQualified(team.id, roundNumber, eventId))) {
       continue; // Skip if not qualified
     }
 
-    // Check if team already has an assignment for taskOrder = 1
+    // Check if team already has an assignment for this round
     const existing = await db.select({ id: teamTaskAssignments.id })
       .from(teamTaskAssignments)
       .where(and(
-        eq(teamTaskAssignments.teamId, team.id), 
+        eq(teamTaskAssignments.teamId, team.id),
         eq(teamTaskAssignments.roundId, roundId),
         eq(teamTaskAssignments.assignmentOrder, 1)
       ))
@@ -211,42 +194,34 @@ async function preassignStartingTasks(round) {
 
     if (existing.length > 0) continue; // Already assigned
 
-    // Pick a starting location (if multiple starting locations exist, we pick one randomly or sequentially, but usually there's one)
-    // For simplicity, we just pick the location of the first startingTask
-    const baseTask = startingTasks[0];
-    const locId = baseTask.locationId;
-    let selectedTaskId = baseTask.id;
+    // Pick the least-assigned task (load balanced random distribution)
+    let selectedTask = allRoundTasks[0];
+    let minCount = Infinity;
 
-    if (locId && locationModes.get(locId) === 'pool') {
-      // Run pool assignment logic for this location
-      const poolTaskIds = poolTasksMap.get(locId) || [];
-      if (poolTaskIds.length > 0) {
-        // Find global counts for these tasks
-        const globalAssignments = await db
-          .select({ taskId: teamTaskAssignments.taskId, count: sql`count(*)` })
-          .from(teamTaskAssignments)
-          .where(inArray(teamTaskAssignments.taskId, poolTaskIds))
-          .groupBy(teamTaskAssignments.taskId);
-          
-        const countsMap = new Map(globalAssignments.map(g => [g.taskId, parseInt(g.count)]));
-        
-        let minCount = Infinity;
-        for (const tId of poolTaskIds) {
-          const count = countsMap.get(tId) || 0;
-          if (count < minCount) {
-            minCount = count;
-            selectedTaskId = tId;
-          }
-        }
+    // Shuffle candidates with same count for randomness
+    const shuffledTasks = [...allRoundTasks];
+    for (let i = shuffledTasks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledTasks[i], shuffledTasks[j]] = [shuffledTasks[j], shuffledTasks[i]];
+    }
+
+    for (const t of shuffledTasks) {
+      const count = localCounts.get(t.id) || 0;
+      if (count < minCount) {
+        minCount = count;
+        selectedTask = t;
       }
     }
+
+    // Update local count
+    localCounts.set(selectedTask.id, (localCounts.get(selectedTask.id) || 0) + 1);
 
     // Insert assignment
     await db.insert(teamTaskAssignments).values({
       teamId: team.id,
       roundId,
-      taskId: selectedTaskId,
-      locationId: locId,
+      taskId: selectedTask.id,
+      locationId: selectedTask.locationId,
       assignmentOrder: 1,
       assignedAt: roundStartedAt,
       assignedAtPausedSnapshot: roundPausedSnapshot,
