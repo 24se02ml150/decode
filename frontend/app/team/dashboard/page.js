@@ -224,7 +224,11 @@ export default function TeamDashboard() {
                     className={`card p-4 flex items-center gap-3 ${task.isCompleted ? 'opacity-70' : task.isUnlocked ? 'card-interactive cursor-pointer' : 'opacity-40'}`}
                     onClick={() => {
                       if (task.isUnlocked && !task.isCompleted) {
-                        router.push(`/team/scan`);
+                        if (task.token) {
+                          router.push(`/team/task/${task.token}`);
+                        } else {
+                          router.push(`/team/scan`);
+                        }
                       }
                     }}
                   >
