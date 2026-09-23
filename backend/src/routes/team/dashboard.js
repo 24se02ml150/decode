@@ -168,6 +168,22 @@ router.get('/', async (req, res, next) => {
           const isFirstTask = task.taskOrder === Math.min(...taskList.map(t => t.taskOrder));
           const isUnlocked = isFirstTask || teamTask?.isUnlocked || false;
 
+          let token = null;
+          if (isUnlocked && (!teamTask || !teamTask.isCompleted)) {
+            if (activeRound.assignCount) {
+              const [assignment] = await db.select({ locationId: teamTaskAssignments.locationId })
+                .from(teamTaskAssignments)
+                .where(and(eq(teamTaskAssignments.teamId, teamId), eq(teamTaskAssignments.taskId, task.id)));
+              if (assignment?.locationId) {
+                const [qr] = await db.select({ secureToken: qrCodes.secureToken }).from(qrCodes).where(eq(qrCodes.locationId, assignment.locationId));
+                token = qr?.secureToken || null;
+              }
+            } else {
+              const [qr] = await db.select({ secureToken: qrCodes.secureToken }).from(qrCodes).where(eq(qrCodes.taskId, task.id));
+              token = qr?.secureToken || null;
+            }
+          }
+
           return {
             id: task.id,
             title: task.title || `Task ${task.taskOrder}`,
@@ -175,6 +191,7 @@ router.get('/', async (req, res, next) => {
             points: task.points,
             isCompleted: teamTask?.isCompleted || false,
             isUnlocked,
+            token,
             attempts: teamTask?.attempts || 0,
             startingClue: isFirstTask && !teamTask?.isUnlocked ? task.startingClue : null,
           };
