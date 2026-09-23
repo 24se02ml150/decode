@@ -83,48 +83,7 @@ export default function TaskPage({ params }) {
     );
   }
 
-  // Correct answer view
-  if (result?.isCorrect) {
-    return (
-      <div className="min-h-dvh bg-bg flex flex-col">
-        <div className="flex-1 flex flex-col items-center justify-center p-5 text-center animate-fade-in-up">
-          {/* Success Icon */}
-          <div className="w-20 h-20 rounded-full bg-success-light flex items-center justify-center mb-6 animate-checkmark">
-            <svg className="w-10 h-10 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-          </div>
-
-          <h2 className="text-2xl font-bold text-success mb-2">Correct!</h2>
-          <p className="text-text-secondary mb-2">Task completed successfully.</p>
-          <p className="text-accent font-semibold text-lg mb-8">+{result.pointsEarned} points</p>
-
-          {/* Location Hint */}
-          {result.locationHint && !result.roundComplete && (
-            <div className="card p-5 w-full max-w-sm mb-6 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-              <p className="text-xs font-semibold text-accent uppercase tracking-wider mb-2">Next Location</p>
-              <p className="text-text-primary font-medium text-lg leading-relaxed">"{result.locationHint}"</p>
-            </div>
-          )}
-
-          {/* Round Complete */}
-          {result.roundComplete && (
-            <div className="card p-5 w-full max-w-sm mb-6 bg-accent-subtle border-accent/20 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-              <p className="text-lg font-bold text-accent mb-1">🎉 Round Completed!</p>
-              <p className="text-text-secondary text-sm">You've completed all tasks in this round.</p>
-            </div>
-          )}
-
-          <button
-            onClick={() => router.push('/team/dashboard')}
-            className="btn btn-primary btn-lg btn-full max-w-sm"
-          >
-            Continue
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Correct answer modal is rendered over the active task view
 
   // Already completed
   if (task.isCompleted) {
@@ -265,6 +224,50 @@ export default function TaskPage({ params }) {
           </form>
         </div>
       </div>
+
+      {/* Success Modal Overlay */}
+      {result?.isCorrect && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in-up flex flex-col items-center text-center">
+            
+            {/* Success Icon */}
+            <div className="w-16 h-16 rounded-full bg-success-light flex items-center justify-center mb-5 animate-checkmark">
+              <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+
+            <h2 className="text-2xl font-bold text-success mb-2">
+              {result.roundComplete ? 'ROUND COMPLETED!' : 'TASK COMPLETED!'}
+            </h2>
+            <p className="text-accent font-semibold text-lg mb-6">+{result.pointsEarned} points</p>
+
+            {/* Location Hint */}
+            {result.locationHint && !result.roundComplete && (
+              <div className="w-full bg-bg rounded-xl p-5 mb-6 border border-border shadow-sm">
+                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Next Location Clue</p>
+                <p className="text-text-primary font-medium text-lg leading-relaxed">
+                  "{result.locationHint}"
+                </p>
+              </div>
+            )}
+
+            {/* Round Complete Message */}
+            {result.roundComplete && (
+              <div className="w-full bg-bg rounded-xl p-5 mb-6 border border-border shadow-sm">
+                <p className="text-text-secondary text-sm">You've successfully completed all tasks in this round. Great job!</p>
+              </div>
+            )}
+
+            <button
+              onClick={() => router.push('/team/dashboard')}
+              className="btn btn-primary btn-lg w-full"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
