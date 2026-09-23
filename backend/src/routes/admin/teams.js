@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../../db/index.js';
 import { users, teamRounds, teamTasks, taskAttempts, rounds, tasks, teamTaskAssignments } from '../../db/schema.js';
-import { eq, and, sql, desc, ilike, count } from 'drizzle-orm';
+import { eq, and, sql, desc, ilike, count, inArray } from 'drizzle-orm';
 import { validate } from '../../middleware/validate.js';
 import { BadRequestError, NotFoundError } from '../../utils/errors.js';
 import { generateTeamId, generatePassword, paginationParams } from '../../utils/helpers.js';
