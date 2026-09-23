@@ -199,13 +199,8 @@ export default function TeamDashboard() {
         </div>
       )}
 
-<<<<<<< HEAD
       {/* Task List or Starting Clue */}
       {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
-=======
-      {/* Task List — Round 1 only */}
-      {currentRound && currentRound.status === 'active' && !isQuestionsRound && (
->>>>>>> 1331507901c4e0587c200e61772382e160580ef7
         <div className="mx-5 mb-4">
           {activeStartingClue ? (
             <div className="card p-6 text-center animate-fade-in border-2 border-accent/30 bg-accent-light/10">
@@ -273,11 +268,7 @@ export default function TeamDashboard() {
         </div>
       )}
 
-<<<<<<< HEAD
       {/* Scan QR CTA */}
-=======
-      {/* Scan QR CTA — Round 1 only */}
->>>>>>> 1331507901c4e0587c200e61772382e160580ef7
       {currentRound && currentRound.status === 'active' && !isQuestionsRound && !eliminatedRound && (
         <div className="mx-5 mt-6 mb-4">
           <button
