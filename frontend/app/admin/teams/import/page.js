@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import api from '@/lib/api';
+import api, { API_URL } from '@/lib/api';
 import { ChevronLeft, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from 'lucide-react';
 import Link from 'next/link';
 
@@ -136,7 +136,7 @@ export default function BulkImportPage() {
         <div className="card p-6">
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-lg font-bold">Upload File</h2>
-            <a href="/api/admin/teams/bulk-import/template" className="btn btn-secondary btn-sm flex items-center gap-2">
+            <a href={`${API_URL}/api/admin/teams/bulk-import/template`} className="btn btn-secondary btn-sm flex items-center gap-2">
               <Download size={14} /> Download Template
             </a>
           </div>
