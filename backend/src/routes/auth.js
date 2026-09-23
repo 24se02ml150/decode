@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, or, sql } from 'drizzle-orm';
 import { validate } from '../middleware/validate.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { UnauthorizedError, BadRequestError } from '../utils/errors.js';
@@ -33,11 +33,20 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
         .where(and(eq(users.email, email), eq(users.role, 'admin')));
       user = result[0];
     } else if (teamId) {
-      // Team login by team ID
+      // Team login by team ID or team Name
+      const searchStr = teamId.trim();
       const result = await db
         .select()
         .from(users)
-        .where(eq(users.teamId, teamId.toUpperCase()));
+        .where(
+          and(
+            eq(users.role, 'team'),
+            or(
+              sql`LOWER(${users.teamId}) = LOWER(${searchStr})`,
+              sql`LOWER(${users.teamName}) = LOWER(${searchStr})`
+            )
+          )
+        );
       user = result[0];
     }
 

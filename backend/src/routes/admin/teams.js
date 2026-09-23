@@ -300,6 +300,38 @@ router.patch('/:id', validate(updateTeamSchema), async (req, res, next) => {
 
 
 
+// POST /api/admin/teams/bulk-delete
+router.post('/bulk-delete', async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestError('No team IDs provided.');
+    }
+
+    const teamIds = ids.map(id => parseInt(id)).filter(id => !isNaN(id));
+    if (teamIds.length === 0) {
+      throw new BadRequestError('Invalid team IDs.');
+    }
+
+    // Delete only teams (not admins) using existing cascade behavior
+    const deleted = await db.delete(users)
+      .where(and(
+        inArray(users.id, teamIds),
+        eq(users.role, 'team')
+      ))
+      .returning({ id: users.id });
+
+    res.json({ 
+      success: true, 
+      message: `${deleted.length} team(s) deleted successfully.`,
+      data: { deletedCount: deleted.length }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /api/admin/teams/:id
 router.delete('/:id', async (req, res, next) => {
   try {

@@ -11,6 +11,7 @@ export default function TeamsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
+  const [selectedTeams, setSelectedTeams] = useState(new Set());
   
   // Modals
   const [showCreate, setShowCreate] = useState(false);
@@ -33,10 +34,42 @@ export default function TeamsPage() {
       const res = await api.admin.getTeams(`page=${page}&limit=20&search=${search}`);
       setTeams(res.data.teams);
       setPagination(res.data.pagination);
+      setSelectedTeams(new Set()); // Reset selection on page/search change
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedTeams(new Set(teams.map(t => t.id)));
+    } else {
+      setSelectedTeams(new Set());
+    }
+  };
+
+  const handleSelectTeam = (id) => {
+    const newSelected = new Set(selectedTeams);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedTeams(newSelected);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTeams.size === 0) return;
+    if (!confirm(`Are you sure you want to completely delete ${selectedTeams.size} selected teams? This cannot be undone.`)) return;
+    
+    try {
+      await api.admin.bulkDeleteTeams(Array.from(selectedTeams));
+      setSelectedTeams(new Set());
+      loadTeams();
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -200,6 +233,21 @@ export default function TeamsPage() {
         </button>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedTeams.size > 0 && (
+        <div className="card p-4 flex items-center justify-between bg-error/5 border-error/20 animate-fade-in">
+          <span className="text-sm font-medium text-text-primary">
+            {selectedTeams.size} team{selectedTeams.size !== 1 ? 's' : ''} selected
+          </span>
+          <button 
+            onClick={handleBulkDelete}
+            className="btn btn-primary bg-error hover:bg-error/90 border-error hover:border-error/90 btn-sm gap-2"
+          >
+            <Trash2 size={16} /> Delete Selected
+          </button>
+        </div>
+      )}
+
       {/* Teams Table */}
       <div className="card overflow-hidden">
         {loading ? (
@@ -217,6 +265,14 @@ export default function TeamsPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-bg-hover text-text-secondary border-b border-border">
                 <tr>
+                  <th className="px-6 py-4 w-12 text-center">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-border text-accent focus:ring-accent w-4 h-4"
+                      checked={teams.length > 0 && selectedTeams.size === teams.length}
+                      onChange={handleSelectAll}
+                    />
+                  </th>
                   <th className="px-6 py-4 font-medium">Team Name</th>
                   <th className="px-6 py-4 font-medium">Leader</th>
                   <th className="px-6 py-4 font-medium">Team ID</th>
@@ -227,6 +283,14 @@ export default function TeamsPage() {
               <tbody className="divide-y divide-border">
                 {teams.map((team) => (
                   <tr key={team.id} className="hover:bg-bg-hover/50 transition-colors">
+                    <td className="px-6 py-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-border text-accent focus:ring-accent w-4 h-4 cursor-pointer"
+                        checked={selectedTeams.has(team.id)}
+                        onChange={() => handleSelectTeam(team.id)}
+                      />
+                    </td>
                     <td className="px-6 py-4 font-medium text-text-primary">
                       {team.teamName}
                       {team.mustResetPassword && (

@@ -11,16 +11,18 @@ class ApiError extends Error {
 async function request(endpoint, options = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
-    ...options,
+  const config = { ...options };
+  const isFormData = options.body instanceof FormData || (config.body && typeof config.body === 'object' && config.body instanceof FormData);
+
+  const headers = {
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
   };
 
-  if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
+  config.headers = headers;
+
+  if (config.body && typeof config.body === 'object' && !isFormData) {
     config.body = JSON.stringify(config.body);
   }
 
@@ -64,6 +66,7 @@ export const api = {
     bulkCreateTeams: (data) => request('/api/admin/teams/bulk', { method: 'POST', body: data }),
     updateTeam: (id, data) => request(`/api/admin/teams/${id}`, { method: 'PATCH', body: data }),
     deleteTeam: (id) => request(`/api/admin/teams/${id}`, { method: 'DELETE' }),
+    bulkDeleteTeams: (ids) => request('/api/admin/teams/bulk-delete', { method: 'POST', body: { ids } }),
     getTeamReport: (format = 'csv') => request(`/api/admin/teams/export?format=${format}`),
 
     // Bulk Import

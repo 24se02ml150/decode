@@ -134,11 +134,16 @@ export default function BulkImportPage() {
         </div>
       ) : (
         <div className="card p-6">
-          <h2 className="text-lg font-bold mb-4">Upload File</h2>
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-lg font-bold">Upload File</h2>
+            <a href="/api/admin/teams/bulk-import/template" className="btn btn-secondary btn-sm flex items-center gap-2">
+              <Download size={14} /> Download Template
+            </a>
+          </div>
           <div className="mb-6 bg-bg-hover p-4 rounded-lg text-sm text-text-secondary">
             <p className="font-bold text-text-primary mb-2">Required Excel format (.xlsx):</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Must contain columns: <strong>Team Name</strong> and <strong>Team Leader Name</strong></li>
+              <li>Must contain ONLY ONE column: <strong>Team Name</strong></li>
               <li>Maximum 500 rows per upload</li>
               <li>No duplicate team names allowed</li>
             </ul>
@@ -202,7 +207,6 @@ export default function BulkImportPage() {
                 <tr>
                   <th className="px-4 py-3 font-medium">Row</th>
                   <th className="px-4 py-3 font-medium">Team Name</th>
-                  <th className="px-4 py-3 font-medium">Leader Name</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                 </tr>
               </thead>
@@ -211,7 +215,6 @@ export default function BulkImportPage() {
                   <tr key={i} className={row.isValid ? '' : 'bg-error/5'}>
                     <td className="px-4 py-3 text-text-muted">#{row.rowNumber}</td>
                     <td className="px-4 py-3 font-medium">{row.teamName || '-'}</td>
-                    <td className="px-4 py-3">{row.leaderName || '-'}</td>
                     <td className="px-4 py-3">
                       {row.isValid ? (
                         <span className="inline-flex items-center text-success text-xs font-bold gap-1">

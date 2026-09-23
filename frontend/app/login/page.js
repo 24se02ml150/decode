@@ -76,12 +76,12 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit}>
             {mode === 'team' ? (
               <div className="mb-4">
-                <label className="label" htmlFor="teamId">Team ID</label>
+                <label className="label" htmlFor="teamId">Team ID or Team Name</label>
                 <input
                   id="teamId"
                   type="text"
-                  className="input font-mono tracking-wider uppercase"
-                  placeholder="e.g. TEAM123456"
+                  className="input tracking-wider"
+                  placeholder="e.g. TEAM123 or The Innovators"
                   value={teamId}
                   onChange={(e) => setTeamId(e.target.value)}
                   required
