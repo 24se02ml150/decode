@@ -12,8 +12,10 @@ async function request(endpoint, options = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   const config = { ...options };
-  const isFormData = options.body instanceof FormData || (config.body && typeof config.body === 'object' && config.body instanceof FormData);
-
+  const isFormData = Boolean(
+    options.body && 
+    (options.body instanceof FormData || typeof options.body.append === 'function' || options.body.toString() === '[object FormData]')
+  );
   const headers = {
     ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
