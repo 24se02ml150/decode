@@ -22,6 +22,9 @@ import teamProgressRoutes from './routes/team/progress.js';
 
 const app = express();
 
+// Trust reverse proxy (Vercel/Render/Nginx) so rate limiter uses real client IPs
+app.set('trust proxy', 1);
+
 // ─── Middleware ───
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
@@ -32,12 +35,12 @@ app.use(express.json({ limit: '10mb' }));
 // Rate limiting
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 5000, // increased significantly to avoid blocking legit traffic during event
   message: { success: false, error: { message: 'Too many requests. Please try again later.' } },
 });
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 500, // increased for the same reason
   message: { success: false, error: { message: 'Too many login attempts. Please try again later.' } },
 });
 
